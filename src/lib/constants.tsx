@@ -5,6 +5,9 @@ import Ideal from "@modules/common/icons/ideal"
 import Bancontact from "@modules/common/icons/bancontact"
 import PayPal from "@modules/common/icons/paypal"
 
+export const STORE_NAME =
+  process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+
 /* Map of payment provider_id to their title and icon. Add in any payment providers you want to use. */
 export const paymentInfoMap: Record<
   string,
