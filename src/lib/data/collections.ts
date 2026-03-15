@@ -27,14 +27,10 @@ export const listCollections = async (
     ...(await getCacheOptions("collections")),
   }
 
-  queryParams.limit = queryParams.limit || "100"
-  queryParams.offset = queryParams.offset || "0"
-
   return sdk.client
     .fetch<{ collections: HttpTypes.StoreCollection[]; count: number }>(
-      "/store/collections",
+      "/store/scoped-collections",
       {
-        query: queryParams,
         next,
         cache: "force-cache",
       }
