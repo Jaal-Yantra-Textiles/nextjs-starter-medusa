@@ -1,5 +1,6 @@
 "use server"
 
+import { headers } from "next/headers"
 import { sdk } from "@lib/config"
 import { getCacheOptions } from "./cookies"
 
@@ -26,15 +27,25 @@ export type PublicWebsitePage = {
   }>
 }
 
-const DEFAULT_DOMAIN =
-  process.env.NEXT_PUBLIC_WEBSITE_DOMAIN || "shop.cicilabel.com"
+/**
+ * Resolves the website domain from the current request's Host header.
+ * No env var needed — each partner storefront auto-identifies itself.
+ * Falls back to localhost for dev.
+ */
+export async function getStorefrontDomain(): Promise<string> {
+  const hdrs = await headers()
+  const host = hdrs.get("host") || hdrs.get("x-forwarded-host") || "localhost:8000"
+  // Strip port for local dev
+  return host.replace(/:\d+$/, "")
+}
 
 // GET /web/website/:domain
 export async function getWebsite(
-  domain: string = DEFAULT_DOMAIN
+  domain?: string
 ): Promise<PublicWebsite> {
+  const resolvedDomain = domain || (await getStorefrontDomain())
   const next = { ...(await getCacheOptions("website")) }
-  return sdk.client.fetch<PublicWebsite>(`/web/website/${domain}`, {
+  return sdk.client.fetch<PublicWebsite>(`/web/website/${resolvedDomain}`, {
     next,
     cache: "force-cache",
   })
@@ -42,12 +53,16 @@ export async function getWebsite(
 
 // GET /web/website/:domain/:page
 export async function getWebsitePage(
-  domain: string,
+  domain: string | undefined,
   slug: string
 ): Promise<PublicWebsitePage> {
+  const resolvedDomain = domain || (await getStorefrontDomain())
   const next = { ...(await getCacheOptions("website_page")) }
-  return sdk.client.fetch<PublicWebsitePage>(`/web/website/${domain}/${slug}`, {
-    next,
-    cache: "force-cache",
-  })
+  return sdk.client.fetch<PublicWebsitePage>(
+    `/web/website/${resolvedDomain}/${slug}`,
+    {
+      next,
+      cache: "force-cache",
+    }
+  )
 }

@@ -5,8 +5,6 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import TipTapViewer from "@modules/website/components/tiptap-viewer"
 import VisualEditorBridge from "@modules/website/components/visual-editor-bridge"
 
-const DOMAIN = process.env.NEXT_PUBLIC_WEBSITE_DOMAIN || "shop.cicilabel.com"
-
 export async function generateMetadata({
   params,
 }: {
@@ -14,7 +12,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params
   try {
-    const page = await getWebsitePage(DOMAIN, slug)
+    const page = await getWebsitePage(undefined, slug)
     return { title: page?.title || "Page" }
   } catch {
     return { title: "Page" }
@@ -34,7 +32,7 @@ export default async function Page({
 
   let page: Awaited<ReturnType<typeof getWebsitePage>> | null = null
   try {
-    page = await getWebsitePage(DOMAIN, slug)
+    page = await getWebsitePage(undefined, slug)
   } catch {
     notFound()
   }
