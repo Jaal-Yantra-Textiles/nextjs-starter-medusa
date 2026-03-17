@@ -17,6 +17,7 @@ type ProductActionsProps = {
   product: HttpTypes.StoreProduct
   region: HttpTypes.StoreRegion
   disabled?: boolean
+  ctaText?: string
 }
 
 const optionsAsKeymap = (
@@ -31,6 +32,7 @@ const optionsAsKeymap = (
 export default function ProductActions({
   product,
   disabled,
+  ctaText,
 }: ProductActionsProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -180,7 +182,7 @@ export default function ProductActions({
             ? "Select variant"
             : !inStock || !isValidVariant
             ? "Out of stock"
-            : "Add to cart"}
+            : ctaText || "Add to cart"}
         </Button>
         <MobileActions
           product={product}

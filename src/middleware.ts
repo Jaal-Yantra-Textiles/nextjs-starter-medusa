@@ -104,6 +104,11 @@ async function getCountryCode(
  * Middleware to handle region selection and onboarding status.
  */
 export async function middleware(request: NextRequest) {
+  // Skip redirect loop for visual/theme editor iframes (cross-origin cookie issue)
+  const isEditorMode =
+    request.nextUrl.searchParams.get("visual_editor") === "true" ||
+    request.nextUrl.searchParams.get("theme_editor") === "true"
+
   let redirectUrl = request.nextUrl.href
 
   let response = NextResponse.redirect(redirectUrl, 307)
@@ -124,8 +129,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // if one of the country codes is in the url and the cache id is not set, set the cache id and redirect
+  // if one of the country codes is in the url and the cache id is not set, set the cache id
+  // In editor mode, set the cookie without a redirect to avoid cross-origin redirect loops
   if (urlHasCountryCode && !cacheIdCookie) {
+    if (isEditorMode) {
+      const nextResponse = NextResponse.next()
+      nextResponse.cookies.set("_medusa_cache_id", cacheId, {
+        maxAge: 60 * 60 * 24,
+      })
+      return nextResponse
+    }
+
     response.cookies.set("_medusa_cache_id", cacheId, {
       maxAge: 60 * 60 * 24,
     })

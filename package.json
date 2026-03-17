@@ -1,5 +1,5 @@
 {
-  "name": "medusa-next",
+  "name": "@jyt/storefront-starter",
   "version": "1.0.3",
   "private": true,
   "author": "Kasper Fabricius Kristensen <kasper@medusajs.com> & Victor Gerbrands <victor@medusajs.com> (https://www.medusajs.com)",
@@ -53,13 +53,10 @@
     "tailwindcss": "^3.0.23",
     "typescript": "^5.3.2"
   },
-  "resolutions": {
-    "@types/react": "19.0.4",
-    "@types/react-dom": "19.0.4"
-  },
   "overrides": {
     "react": "19.0.4",
-    "react-dom": "19.0.4"
-  },
-  "packageManager": "yarn@4.12.0"
+    "react-dom": "19.0.4",
+    "@types/react": "19.0.4",
+    "@types/react-dom": "19.0.4"
+  }
 }

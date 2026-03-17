@@ -21,6 +21,12 @@ module.exports = {
         padding: "padding-top padding-right padding-bottom padding-left",
       },
       colors: {
+        theme: {
+          primary: "var(--theme-primary, #7c3aed)",
+          background: "var(--theme-background, #ffffff)",
+          text: "var(--theme-text, #111827)",
+          accent: "var(--theme-accent, #f59e0b)",
+        },
         grey: {
           0: "#FFFFFF",
           5: "#F9FAFB",

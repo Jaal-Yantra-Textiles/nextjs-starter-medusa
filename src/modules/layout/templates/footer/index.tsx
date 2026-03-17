@@ -1,18 +1,23 @@
 import { listCategories } from "@lib/data/categories"
 import { listCollections } from "@lib/data/collections"
 import { STORE_NAME } from "@lib/constants"
+import { WebsiteTheme } from "@lib/data/website"
 import { Text, clx } from "@medusajs/ui"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
-export default async function Footer() {
+export default async function Footer({ theme }: { theme?: WebsiteTheme | null }) {
   const { collections } = await listCollections({
     fields: "*products",
   })
   const productCategories = await listCategories()
 
+  const storeName = theme?.branding?.store_name || STORE_NAME
+  const footerText = theme?.footer?.text
+  const socialLinks = theme?.footer?.social_links
+
   return (
-    <footer className="border-t border-ui-border-base w-full">
+    <footer className="border-t border-ui-border-base w-full" data-theme-section="footer">
       <div className="content-container flex flex-col w-full">
         <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
           <div>
@@ -20,7 +25,7 @@ export default async function Footer() {
               href="/"
               className="txt-compact-xlarge-plus text-ui-fg-subtle hover:text-ui-fg-base uppercase"
             >
-              {STORE_NAME}
+              {storeName}
             </LocalizedClientLink>
           </div>
           <div className="text-small-regular gap-10 md:gap-x-16 grid grid-cols-2 sm:grid-cols-3">
@@ -108,11 +113,31 @@ export default async function Footer() {
                 </ul>
               </div>
             )}
+            {socialLinks && socialLinks.length > 0 && (
+              <div className="flex flex-col gap-y-2">
+                <span className="txt-small-plus txt-ui-fg-base">Social</span>
+                <ul className="grid grid-cols-1 gap-2 text-ui-fg-subtle txt-small">
+                  {socialLinks.map((sl) => (
+                    <li key={sl.platform}>
+                      <a
+                        href={sl.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-ui-fg-base"
+                      >
+                        {sl.platform}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
         <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
-          <Text className="txt-compact-small">
-            &copy; {new Date().getFullYear()} {STORE_NAME}. All rights reserved.
+          <Text className="txt-compact-small" data-theme-section="footer-text">
+            &copy; {new Date().getFullYear()} {storeName}.{" "}
+            {footerText || "All rights reserved."}
           </Text>
         </div>
       </div>

@@ -3,31 +3,44 @@
 import { Popover, PopoverPanel, Transition } from "@headlessui/react"
 import { ArrowRightMini, XMark } from "@medusajs/icons"
 import { Text, clx, useToggleState } from "@medusajs/ui"
-import { Fragment } from "react"
+import { Fragment, useMemo } from "react"
 
 import { STORE_NAME } from "@lib/constants"
+import { WebsiteTheme } from "@lib/data/website"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import CountrySelect from "../country-select"
 import LanguageSelect from "../language-select"
 import { HttpTypes } from "@medusajs/types"
 import { Locale } from "@lib/data/locales"
 
-const SideMenuItems = {
-  Home: "/",
-  Store: "/store",
-  Account: "/account",
-  Cart: "/cart",
-}
+const DEFAULT_MENU_ITEMS: Array<{ label: string; href: string }> = [
+  { label: "Home", href: "/" },
+  { label: "Store", href: "/store" },
+  { label: "Account", href: "/account" },
+  { label: "Cart", href: "/cart" },
+]
 
 type SideMenuProps = {
   regions: HttpTypes.StoreRegion[] | null
   locales: Locale[] | null
   currentLocale: string | null
+  theme?: WebsiteTheme | null
 }
 
-const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
+const SideMenu = ({ regions, locales, currentLocale, theme }: SideMenuProps) => {
   const countryToggleState = useToggleState()
   const languageToggleState = useToggleState()
+
+  const menuItems = useMemo(() => {
+    const themeLinks = theme?.navigation?.links
+    if (themeLinks && themeLinks.length > 0) {
+      return themeLinks
+    }
+    return DEFAULT_MENU_ITEMS
+  }, [theme?.navigation?.links])
+
+  const showAccountLink = theme?.navigation?.show_account_link ?? true
+  const storeName = theme?.branding?.store_name || STORE_NAME
 
   return (
     <div className="h-full">
@@ -73,16 +86,22 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                       </button>
                     </div>
                     <ul className="flex flex-col gap-6 items-start justify-start">
-                      {Object.entries(SideMenuItems).map(([name, href]) => {
+                      {menuItems.map((item) => {
+                        if (
+                          item.href === "/account" &&
+                          !showAccountLink
+                        ) {
+                          return null
+                        }
                         return (
-                          <li key={name}>
+                          <li key={item.label}>
                             <LocalizedClientLink
-                              href={href}
+                              href={item.href}
                               className="text-3xl leading-10 hover:text-ui-fg-disabled"
                               onClick={close}
-                              data-testid={`${name.toLowerCase()}-link`}
+                              data-testid={`${item.label.toLowerCase()}-link`}
                             >
-                              {name}
+                              {item.label}
                             </LocalizedClientLink>
                           </li>
                         )
@@ -127,7 +146,7 @@ const SideMenu = ({ regions, locales, currentLocale }: SideMenuProps) => {
                         />
                       </div>
                       <Text className="flex justify-between txt-compact-small">
-                        © {new Date().getFullYear()} {STORE_NAME}. All rights
+                        &copy; {new Date().getFullYear()} {storeName}. All rights
                         reserved.
                       </Text>
                     </div>
