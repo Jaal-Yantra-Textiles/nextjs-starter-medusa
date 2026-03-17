@@ -28,7 +28,7 @@ export default async function Home(props: {
     getRegion(countryCode),
     listCollections({ fields: "id, handle, title" }),
     listCategories().catch(() => []),
-    getWebsite().catch(() => null),
+    getWebsite(undefined, { noCache: isThemeEditor }).catch(() => null),
   ])
 
   if (!region) return null

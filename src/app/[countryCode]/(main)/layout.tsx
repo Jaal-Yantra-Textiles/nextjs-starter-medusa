@@ -1,4 +1,5 @@
 import { Metadata } from "next"
+import { headers } from "next/headers"
 
 import { listCartOptions, retrieveCart } from "@lib/data/cart"
 import { retrieveCustomer } from "@lib/data/customer"
@@ -17,10 +18,13 @@ export const metadata: Metadata = {
 }
 
 export default async function PageLayout(props: { children: React.ReactNode }) {
+  const hdrs = await headers()
+  const isIframe = hdrs.get("sec-fetch-dest") === "iframe"
+
   const [customer, cart, website] = await Promise.all([
     retrieveCustomer(),
     retrieveCart(),
-    getWebsite().catch(() => null),
+    getWebsite(undefined, { noCache: isIframe }).catch(() => null),
   ])
   let shippingOptions: StoreCartShippingOption[] = []
 

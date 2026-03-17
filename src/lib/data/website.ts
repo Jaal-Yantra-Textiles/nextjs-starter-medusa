@@ -91,9 +91,17 @@ export async function getStorefrontDomain(): Promise<string> {
 
 // GET /web/website/:domain
 export async function getWebsite(
-  domain?: string
+  domain?: string,
+  opts?: { noCache?: boolean }
 ): Promise<PublicWebsite> {
   const resolvedDomain = domain || (await getStorefrontDomain())
+
+  if (opts?.noCache) {
+    return sdk.client.fetch<PublicWebsite>(`/web/website/${resolvedDomain}`, {
+      cache: "no-store",
+    })
+  }
+
   const next = { ...(await getCacheOptions("website")) }
   return sdk.client.fetch<PublicWebsite>(`/web/website/${resolvedDomain}`, {
     next,
