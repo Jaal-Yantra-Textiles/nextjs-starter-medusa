@@ -84,25 +84,27 @@ const PayUPaymentButton = ({
       form.method = "POST"
       form.action = payuData.payment_url
 
+      // IMPORTANT: Use the exact same values that were used to generate the hash
+      // Any mismatch between hash inputs and form fields causes "incorrectly calculated hash"
       const fields: Record<string, string> = {
         key: payuData.key || "",
         txnid: payuData.txnid || "",
         amount: payuData.amount || "",
         productinfo: payuData.productinfo || "",
-        firstname: cart.billing_address?.first_name || payuData.firstname || "",
-        email: cart.email || payuData.email || "",
-        phone: cart.billing_address?.phone || payuData.phone || "",
+        firstname: payuData.firstname || "",
+        email: payuData.email || "",
+        phone: payuData.phone || cart.billing_address?.phone || "",
         hash: payuData.hash || "",
         surl: `${window.location.origin}/api/payu/success?cart_id=${cart.id}`,
         furl: `${window.location.origin}/api/payu/failure?cart_id=${cart.id}`,
-        udf1: cart.id || "",
+        udf1: payuData.udf1 || "",
         udf2: "",
         udf3: "",
         udf4: "",
         udf5: "",
       }
 
-      // Add lastname if available
+      // Lastname is not part of the hash, safe to add from cart
       if (cart.billing_address?.last_name) {
         fields.lastname = cart.billing_address.last_name
       }
