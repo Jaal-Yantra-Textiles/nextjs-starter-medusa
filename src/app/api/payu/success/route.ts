@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server"
 import { sdk } from "@lib/config"
 import { cookies as nextCookies } from "next/headers"
 
+function failedRedirect(
+  countryCode: string,
+  error: string,
+  cartId: string | null,
+  requestUrl: string
+) {
+  const params = new URLSearchParams()
+  params.set("error", error)
+  if (cartId) params.set("cart_id", cartId)
+  return NextResponse.redirect(
+    new URL(
+      `/${countryCode}/checkout/payment-failed?${params.toString()}`,
+      requestUrl
+    )
+  )
+}
+
 export async function POST(request: NextRequest) {
   const formData = await request.formData()
   const cartId = request.nextUrl.searchParams.get("cart_id")
@@ -10,38 +27,56 @@ export async function POST(request: NextRequest) {
   const txnid = formData.get("txnid")?.toString() || ""
   const mihpayid = formData.get("mihpayid")?.toString() || ""
   const hash = formData.get("hash")?.toString() || ""
+  const amount = formData.get("amount")?.toString() || ""
 
-  if (status !== "success" || !cartId) {
-    // Redirect to checkout with error
-    const countryCode = (await nextCookies()).get("_medusa_country_code")?.value || "in"
-    return NextResponse.redirect(
-      new URL(`/${countryCode}/checkout?step=payment&error=payment_failed`, request.url)
-    )
+  const cookies = await nextCookies()
+  const countryCode = cookies.get("_medusa_country_code")?.value || "in"
+
+  if (!cartId) {
+    return failedRedirect(countryCode, "Missing cart reference", null, request.url)
+  }
+
+  if (status !== "success") {
+    return failedRedirect(countryCode, "Payment was not successful", cartId, request.url)
   }
 
   try {
-    // Complete the cart — Medusa will call authorizePayment on the PayU provider
-    // Pass the PayU response data so the provider can verify
-    const cookies = await nextCookies()
-    const token = cookies.get("_medusa_jwt")?.value
-    const headers: Record<string, string> = {}
-    if (token) headers.authorization = `Bearer ${token}`
+    const result = await sdk.client.fetch<{
+      type: string
+      order_id?: string
+      error?: string
+    }>("/store/payu/complete", {
+      method: "POST",
+      body: {
+        cart_id: cartId,
+        payu_status: status,
+        mihpayid,
+        txnid,
+        hash,
+        amount,
+      },
+    })
 
-    await sdk.store.cart.complete(cartId, {}, headers)
+    if (result.type === "order" && result.order_id) {
+      cookies.set("_medusa_cart_id", "", { maxAge: -1 })
+      return NextResponse.redirect(
+        new URL(`/${countryCode}/order/${result.order_id}/confirmed`, request.url)
+      )
+    }
 
-    // Clear cart cookie
-    cookies.set("_medusa_cart_id", "", { maxAge: -1 })
-
-    // Redirect to order confirmation
-    const countryCode = cookies.get("_medusa_country_code")?.value || "in"
-    return NextResponse.redirect(
-      new URL(`/${countryCode}/order/confirmed`, request.url)
+    return failedRedirect(
+      countryCode,
+      result.error || "Payment could not be authorized",
+      cartId,
+      request.url
     )
   } catch (error: any) {
-    console.error("[PayU Success] Error completing cart:", error)
-    const countryCode = (await nextCookies()).get("_medusa_country_code")?.value || "in"
-    return NextResponse.redirect(
-      new URL(`/${countryCode}/checkout?step=payment&error=order_failed`, request.url)
+    console.error("[PayU Success] Error:", error?.message || error)
+    return failedRedirect(
+      countryCode,
+      "Something went wrong completing your order",
+      cartId,
+      request.url
     )
   }
 }
