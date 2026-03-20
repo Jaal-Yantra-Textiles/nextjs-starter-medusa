@@ -1,10 +1,12 @@
 import { Heading, Text } from "@medusajs/ui"
 import { STORE_NAME } from "@lib/constants"
-import { WebsiteTheme } from "@lib/data/website"
+import { WebsiteTheme, AnimationType } from "@lib/data/website"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import HeroAnimationWrapper from "./hero-animation-wrapper"
 
 const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEditor?: boolean }) => {
   const hero = theme?.hero
+  const animations = theme?.animations
   const layout = hero?.layout || "center"
   const title = hero?.title || STORE_NAME
   const subtitle = hero?.subtitle || "Welcome to our store"
@@ -18,6 +20,12 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
   const secondaryCtaLink = hero?.secondary_cta_link || "/store"
   const features = hero?.features
 
+  // Determine animation: hero-specific > global hero_entrance > none
+  const animationsEnabled = animations?.enabled !== false
+  const heroAnimation: AnimationType | undefined = animationsEnabled
+    ? (hero?.animation || animations?.hero_entrance || "none")
+    : "none"
+
   const sectionAttrs = isThemeEditor ? { "data-theme-section": "hero" } : {}
 
   // Split layout: text left, image right
@@ -25,7 +33,7 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
     return (
       <div className="w-full border-b border-ui-border-base" {...sectionAttrs}>
         <div className="content-container grid grid-cols-1 small:grid-cols-2 min-h-[75vh]">
-          <div className="flex flex-col justify-center py-16 small:py-24 gap-6">
+          <HeroAnimationWrapper animation={heroAnimation} className="flex flex-col justify-center py-16 small:py-24 gap-6">
             <HeroContent
               badgeText={badgeText}
               title={title}
@@ -37,7 +45,7 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
               secondaryCtaLink={secondaryCtaLink}
               align="left"
             />
-          </div>
+          </HeroAnimationWrapper>
           <div className="relative hidden small:block">
             {bgImage ? (
               <img
@@ -87,7 +95,8 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
           />
         )}
 
-        <div
+        <HeroAnimationWrapper
+          animation={heroAnimation}
           className={`absolute inset-0 z-10 flex flex-col justify-center ${alignmentClasses[layout]} px-8 small:px-32 gap-6`}
         >
           <HeroContent
@@ -102,7 +111,7 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
             align={layout}
             hasOverlay={!!bgImage && overlayOpacity > 0}
           />
-        </div>
+        </HeroAnimationWrapper>
       </div>
       {features && features.length > 0 && (
         <FeaturesBar features={features} />

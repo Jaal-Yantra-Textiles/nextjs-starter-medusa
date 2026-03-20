@@ -6,7 +6,19 @@ type ThemeEditorMessage =
   | { type: "THEME_EDITOR_INIT" }
   | {
       type: "UPDATE_THEME_PREVIEW"
-      section: "colors" | "branding" | "hero" | "navigation" | "footer"
+      section:
+        | "colors"
+        | "branding"
+        | "hero"
+        | "navigation"
+        | "footer"
+        | "animations"
+        | "typography"
+        | "trust_banner"
+        | "text_with_image"
+        | "testimonials"
+        | "banner"
+        | "newsletter"
       data: Record<string, unknown>
     }
 
@@ -115,6 +127,109 @@ export default function ThemeEditorBridge() {
     }
   }, [])
 
+  const loadGoogleFont = useCallback((fontName: string) => {
+    const SYSTEM_FONTS = ["Inter", "System UI"]
+    if (SYSTEM_FONTS.includes(fontName)) return
+    const id = `gfont-${fontName.replace(/\s+/g, "-").toLowerCase()}`
+    if (document.getElementById(id)) return
+    const link = document.createElement("link")
+    link.id = id
+    link.rel = "stylesheet"
+    link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/\s+/g, "+")}:wght@400;500;600;700&display=swap`
+    document.head.appendChild(link)
+  }, [])
+
+  const updateTypography = useCallback((data: Record<string, unknown>) => {
+    const root = document.documentElement
+    if (data.font_family) {
+      loadGoogleFont(data.font_family as string)
+      root.style.setProperty("--theme-font-family", `${data.font_family}, sans-serif`)
+      document.body.style.fontFamily = `${data.font_family}, sans-serif`
+    }
+    if (data.heading_font_family) {
+      loadGoogleFont(data.heading_font_family as string)
+      root.style.setProperty("--theme-heading-font-family", `${data.heading_font_family}, sans-serif`)
+      document.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((el) => {
+        ;(el as HTMLElement).style.fontFamily = `${data.heading_font_family}, sans-serif`
+      })
+    }
+    if (data.base_font_size) {
+      root.style.setProperty("--theme-base-font-size", data.base_font_size as string)
+      document.body.style.fontSize = data.base_font_size as string
+    }
+    if (data.heading_weight) {
+      root.style.setProperty("--theme-heading-weight", data.heading_weight as string)
+      document.querySelectorAll("h1, h2, h3, h4, h5, h6").forEach((el) => {
+        ;(el as HTMLElement).style.fontWeight = data.heading_weight as string
+      })
+    }
+  }, [loadGoogleFont])
+
+  const updateAnimations = useCallback((data: Record<string, unknown>) => {
+    const root = document.documentElement
+    const durationMap: Record<string, string> = { fast: "0.3s", normal: "0.6s", slow: "0.9s" }
+
+    if (data.global_duration) {
+      const dur = durationMap[data.global_duration as string] || "0.6s"
+      root.style.setProperty("--theme-anim-duration", dur)
+    }
+    if (data.stagger_delay !== undefined) {
+      root.style.setProperty("--theme-stagger-delay", `${data.stagger_delay}ms`)
+    }
+
+    // Replay hero animation on preview
+    if (data.hero_entrance !== undefined) {
+      const heroContent = document.querySelector("[data-theme-section='hero']")
+      if (heroContent) {
+        const wrapper = heroContent.querySelector("[class*='animate-theme-']") || heroContent.firstElementChild
+        if (wrapper) {
+          const el = wrapper as HTMLElement
+          // Remove existing animation classes
+          el.getAnimations().forEach((a) => a.cancel())
+          el.classList.remove("opacity-0")
+          ;[
+            "animate-theme-fade-up", "animate-theme-fade-in", "animate-theme-fade-down",
+            "animate-theme-slide-left", "animate-theme-slide-right",
+            "animate-theme-zoom-in", "animate-theme-zoom-out",
+          ].forEach((c) => el.classList.remove(c))
+
+          const animType = data.hero_entrance as string
+          if (animType && animType !== "none") {
+            // Force reflow then apply new animation
+            el.classList.add("opacity-0")
+            void el.offsetHeight
+            el.classList.remove("opacity-0")
+            el.classList.add(`animate-theme-${animType}`)
+          }
+        }
+      }
+    }
+  }, [])
+
+  const updateSectionText = useCallback(
+    (sectionName: string, data: Record<string, unknown>) => {
+      const section = document.querySelector(
+        `[data-theme-section='${sectionName}']`
+      )
+      if (!section) return
+
+      // Update text content by matching data-theme-el attributes or common elements
+      if (data.title !== undefined) {
+        const h2 = section.querySelector("h2")
+        if (h2) h2.textContent = data.title as string
+      }
+      if (data.heading !== undefined) {
+        const h2 = section.querySelector("h2")
+        if (h2) h2.textContent = data.heading as string
+      }
+      if (data.description !== undefined) {
+        const p = section.querySelector("p")
+        if (p) p.textContent = data.description as string
+      }
+    },
+    []
+  )
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ThemeEditorMessage>) => {
       const msg = event.data
@@ -139,13 +254,26 @@ export default function ThemeEditorBridge() {
           case "footer":
             updateFooter(msg.data)
             break
+          case "animations":
+            updateAnimations(msg.data)
+            break
+          case "typography":
+            updateTypography(msg.data)
+            break
+          case "trust_banner":
+          case "text_with_image":
+          case "testimonials":
+          case "banner":
+          case "newsletter":
+            updateSectionText(msg.section, msg.data)
+            break
         }
       }
     }
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [updateColors, updateBranding, updateHero, updateFooter])
+  }, [updateColors, updateBranding, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText])
 
   // Inject editor outline styles for sections
   useEffect(() => {

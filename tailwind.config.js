@@ -146,6 +146,35 @@ module.exports = {
           "0%": { transform: "translateY(-100%)" },
           "100%": { transform: "translateY(0)" },
         },
+        // Theme animation keyframes
+        "theme-fade-up": {
+          "0%": { opacity: "0", transform: "translateY(30px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "theme-fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "theme-fade-down": {
+          "0%": { opacity: "0", transform: "translateY(-30px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "theme-slide-left": {
+          "0%": { opacity: "0", transform: "translateX(60px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "theme-slide-right": {
+          "0%": { opacity: "0", transform: "translateX(-60px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "theme-zoom-in": {
+          "0%": { opacity: "0", transform: "scale(0.9)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        "theme-zoom-out": {
+          "0%": { opacity: "0", transform: "scale(1.1)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
       },
       animation: {
         ring: "ring 2.2s cubic-bezier(0.5, 0, 0.5, 1) infinite",
@@ -161,6 +190,21 @@ module.exports = {
         enter: "enter 200ms ease-out",
         "slide-in": "slide-in 1.2s cubic-bezier(.41,.73,.51,1.02)",
         leave: "leave 150ms ease-in forwards",
+        // Theme animations (duration controlled via CSS variable)
+        "theme-fade-up":
+          "theme-fade-up var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        "theme-fade-in":
+          "theme-fade-in var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        "theme-fade-down":
+          "theme-fade-down var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        "theme-slide-left":
+          "theme-slide-left var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        "theme-slide-right":
+          "theme-slide-right var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        "theme-zoom-in":
+          "theme-zoom-in var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        "theme-zoom-out":
+          "theme-zoom-out var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
       },
     },
   },
