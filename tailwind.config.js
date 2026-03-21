@@ -175,6 +175,27 @@ module.exports = {
           "0%": { opacity: "0", transform: "scale(1.1)" },
           "100%": { opacity: "1", transform: "scale(1)" },
         },
+        // Background image animations
+        "theme-bg-ken-burns": {
+          "0%": { transform: "scale(1)", objectPosition: "center" },
+          "100%": { transform: "scale(1.15)" },
+        },
+        "theme-bg-zoom-in": {
+          "0%": { transform: "scale(1.1)", opacity: "0" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+        "theme-bg-fade-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "theme-bg-pan-left": {
+          "0%": { objectPosition: "0% center" },
+          "100%": { objectPosition: "100% center" },
+        },
+        "theme-bg-pan-right": {
+          "0%": { objectPosition: "100% center" },
+          "100%": { objectPosition: "0% center" },
+        },
       },
       animation: {
         ring: "ring 2.2s cubic-bezier(0.5, 0, 0.5, 1) infinite",
@@ -205,6 +226,17 @@ module.exports = {
           "theme-zoom-in var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
         "theme-zoom-out":
           "theme-zoom-out var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        // Background image animations
+        "theme-bg-ken-burns":
+          "theme-bg-ken-burns 20s ease-out both",
+        "theme-bg-zoom-in":
+          "theme-bg-zoom-in var(--theme-anim-duration, 0.6s) cubic-bezier(0.16, 1, 0.3, 1) both",
+        "theme-bg-fade-in":
+          "theme-bg-fade-in var(--theme-anim-duration, 0.6s) ease-out both",
+        "theme-bg-pan-left":
+          "theme-bg-pan-left 25s linear both",
+        "theme-bg-pan-right":
+          "theme-bg-pan-right 25s linear both",
       },
     },
   },

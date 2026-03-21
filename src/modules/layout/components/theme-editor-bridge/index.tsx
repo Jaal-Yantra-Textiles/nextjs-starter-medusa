@@ -204,6 +204,26 @@ export default function ThemeEditorBridge() {
         }
       }
     }
+
+    // Replay background image animation
+    if (data.bg_animation !== undefined) {
+      const heroSection = document.querySelector("[data-theme-section='hero']")
+      const bgEl = heroSection?.querySelector("[data-theme-el='hero-bg']") as HTMLElement | null
+      if (bgEl) {
+        bgEl.getAnimations().forEach((a) => a.cancel())
+        ;[
+          "animate-theme-bg-ken-burns", "animate-theme-bg-zoom-in",
+          "animate-theme-bg-fade-in", "animate-theme-bg-pan-left",
+          "animate-theme-bg-pan-right",
+        ].forEach((c) => bgEl.classList.remove(c))
+
+        const bgAnimType = data.bg_animation as string
+        if (bgAnimType && bgAnimType !== "none") {
+          void bgEl.offsetHeight
+          bgEl.classList.add(`animate-theme-bg-${bgAnimType}`)
+        }
+      }
+    }
   }, [])
 
   const updateSectionText = useCallback(

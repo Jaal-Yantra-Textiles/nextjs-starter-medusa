@@ -26,6 +26,17 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
     ? (hero?.animation || animations?.hero_entrance || "none")
     : "none"
 
+  // Background image animation
+  const bgAnimation = animationsEnabled ? (hero?.bg_animation || "none") : "none"
+  const BG_ANIMATION_CLASS: Record<string, string> = {
+    "ken-burns": "animate-theme-bg-ken-burns",
+    "zoom-in": "animate-theme-bg-zoom-in",
+    "fade-in": "animate-theme-bg-fade-in",
+    "pan-left": "animate-theme-bg-pan-left",
+    "pan-right": "animate-theme-bg-pan-right",
+  }
+  const bgAnimClass = BG_ANIMATION_CLASS[bgAnimation] || ""
+
   const sectionAttrs = isThemeEditor ? { "data-theme-section": "hero" } : {}
 
   // Split layout: text left, image right
@@ -46,12 +57,13 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
               align="left"
             />
           </HeroAnimationWrapper>
-          <div className="relative hidden small:block">
+          <div className="relative hidden small:block overflow-hidden">
             {bgImage ? (
               <img
                 src={bgImage}
                 alt={title}
-                className="absolute inset-0 w-full h-full object-cover"
+                data-theme-el="hero-bg"
+                className={`absolute inset-0 w-full h-full object-cover ${bgAnimClass}`}
               />
             ) : (
               <div className="absolute inset-0 bg-ui-bg-subtle" />
@@ -74,18 +86,16 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
 
   return (
     <div className="w-full border-b border-ui-border-base" {...sectionAttrs}>
-      <div
-        className="h-[75vh] w-full relative bg-ui-bg-subtle"
-        style={
-          bgImage
-            ? {
-                backgroundImage: `url(${bgImage})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }
-            : undefined
-        }
-      >
+      <div className="h-[75vh] w-full relative bg-ui-bg-subtle overflow-hidden">
+        {/* Background image with optional animation */}
+        {bgImage && (
+          <img
+            src={bgImage}
+            alt=""
+            data-theme-el="hero-bg"
+            className={`absolute inset-0 w-full h-full object-cover ${bgAnimClass}`}
+          />
+        )}
         {/* Dark overlay */}
         {(bgImage && overlayOpacity > 0 || isThemeEditor) && (
           <div
