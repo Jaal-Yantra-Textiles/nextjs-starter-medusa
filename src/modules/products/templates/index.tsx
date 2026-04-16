@@ -10,8 +10,10 @@ import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-relat
 import { notFound } from "next/navigation"
 import { HttpTypes } from "@medusajs/types"
 import { WebsiteTheme } from "@lib/data/website"
+import { buildBreadcrumbJsonLd } from "@lib/util/breadcrumb-jsonld"
 
 import ProductActionsWrapper from "./product-actions-wrapper"
+import { buildProductJsonLd } from "./product-jsonld"
 
 type ProductTemplateProps = {
   product: HttpTypes.StoreProduct
@@ -36,36 +38,36 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
   const showTabs = pt?.show_tabs !== false
   const showRelated = pt?.show_related_products !== false
 
-  const lowestPrice = product.variants
-    ?.map((v: any) => v.calculated_price?.calculated_amount)
-    .filter((p: any) => p != null)
-    .sort((a: number, b: number) => a - b)[0]
+  const jsonLd = buildProductJsonLd(product, {
+    countryCode,
+    fallbackCurrency: region.currency_code,
+  })
 
-  const currencyCode =
-    product.variants?.[0]?.calculated_price?.currency_code || region.currency_code
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: product.title,
-    description: product.description || undefined,
-    image: product.thumbnail || undefined,
-    material: product.material || undefined,
-    ...(lowestPrice != null && {
-      offers: {
-        "@type": "Offer",
-        price: lowestPrice,
-        priceCurrency: currencyCode?.toUpperCase(),
-        availability: "https://schema.org/InStock",
-      },
-    }),
-  }
+  const breadcrumbLd = buildBreadcrumbJsonLd([
+    { name: "Home", path: `/${countryCode}` },
+    ...(product.collection
+      ? [
+          {
+            name: product.collection.title,
+            path: `/${countryCode}/collections/${product.collection.handle}`,
+          },
+        ]
+      : []),
+    {
+      name: product.title || "Product",
+      path: `/${countryCode}/products/${product.handle}`,
+    },
+  ])
 
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
       />
       <div
         className="content-container flex flex-col small:flex-row small:items-start py-6 relative"

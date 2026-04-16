@@ -2,6 +2,10 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 
 import { getCollectionByHandle } from "@lib/data/collections"
+import {
+  buildLocalizedAlternates,
+  getFirstProductImageFor,
+} from "@lib/util/seo"
 import { StoreCollection } from "@medusajs/types"
 import CollectionTemplate from "@modules/collections/templates"
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
@@ -26,23 +30,42 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     notFound()
   }
 
-  const description = `${collection.title} collection`
+  const description = `Shop the ${collection.title} collection.`
+
+  const alternates = await buildLocalizedAlternates(
+    params.countryCode,
+    `collections/${params.handle}`
+  )
+
+  const metaOgImage = (collection as any).metadata?.og_image
+  const firstProductImage =
+    metaOgImage ||
+    (collection as any).products?.[0]?.thumbnail ||
+    (await getFirstProductImageFor({
+      countryCode: params.countryCode,
+      collectionId: collection.id,
+    })) ||
+    undefined
+
+  const ogImages = firstProductImage
+    ? [{ url: firstProductImage, alt: collection.title }]
+    : undefined
 
   return {
     title: collection.title,
     description,
-    alternates: {
-      canonical: `/${params.countryCode}/collections/${params.handle}`,
-    },
+    alternates,
     openGraph: {
       title: collection.title,
       description,
       type: "website",
+      ...(ogImages ? { images: ogImages } : {}),
     },
     twitter: {
       card: "summary_large_image",
       title: collection.title,
       description,
+      ...(firstProductImage ? { images: [firstProductImage] } : {}),
     },
   } as Metadata
 }

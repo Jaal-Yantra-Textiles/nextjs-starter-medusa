@@ -23,8 +23,36 @@ export const metadata: Metadata = {
 }
 
 export default function RootLayout(props: { children: React.ReactNode }) {
+  const baseUrl = getBaseURL()
+  const storeName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+
+  const organizationLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: storeName,
+    url: baseUrl,
+    logo: `${baseUrl}/logo.png`,
+  }
+
+  const websiteLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: storeName,
+    url: baseUrl,
+  }
+
   return (
     <html lang="en" data-mode="light">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
+        />
+      </head>
       <body>
         <main className="relative">{props.children}</main>
       </body>

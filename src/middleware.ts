@@ -124,27 +124,23 @@ export async function middleware(request: NextRequest) {
   const urlHasCountryCode =
     countryCode && request.nextUrl.pathname.split("/")[1].includes(countryCode)
 
-  // if one of the country codes is in the url and the cache id is set, return next
-  if (urlHasCountryCode && cacheIdCookie) {
-    return NextResponse.next()
-  }
-
-  // if one of the country codes is in the url and the cache id is not set, set the cache id
-  // In editor mode, set the cookie without a redirect to avoid cross-origin redirect loops
-  if (urlHasCountryCode && !cacheIdCookie) {
-    if (isEditorMode) {
-      const nextResponse = NextResponse.next()
+  // If the URL already has a valid country code, serve the page directly.
+  // Set the cache-id cookie on the SAME response (via NextResponse.next) —
+  // never redirect to the same URL, or clients without persistent cookies
+  // (social preview bots, monitoring agents, some crawlers) get stuck in a
+  // 307 loop. The existing editor-mode branch already did this; we now
+  // apply the same behaviour universally.
+  // `isEditorMode` is kept for call-site symmetry; both branches behave
+  // the same now.
+  void isEditorMode
+  if (urlHasCountryCode) {
+    const nextResponse = NextResponse.next()
+    if (!cacheIdCookie) {
       nextResponse.cookies.set("_medusa_cache_id", cacheId, {
         maxAge: 60 * 60 * 24,
       })
-      return nextResponse
     }
-
-    response.cookies.set("_medusa_cache_id", cacheId, {
-      maxAge: 60 * 60 * 24,
-    })
-
-    return response
+    return nextResponse
   }
 
   // check if the url is a static asset

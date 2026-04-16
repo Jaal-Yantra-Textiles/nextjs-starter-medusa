@@ -13,21 +13,48 @@ import { listCollections } from "@lib/data/collections"
 import { listCategories } from "@lib/data/categories"
 import { getRegion } from "@lib/data/regions"
 import { getWebsite, AnimationType } from "@lib/data/website"
+import {
+  buildLocalizedAlternates,
+  getFirstProductImageFor,
+} from "@lib/util/seo"
+import { getBaseURL } from "@lib/util/env"
 import ThemeEditorBridge from "@modules/layout/components/theme-editor-bridge"
 
-export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
-  description: "Shop handmade, locally sourced, and ethically produced fashion.",
-  openGraph: {
-    title: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
-    description: "Shop handmade, locally sourced, and ethically produced fashion.",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
-    description: "Shop handmade, locally sourced, and ethically produced fashion.",
-  },
+export async function generateMetadata(props: {
+  params: Promise<{ countryCode: string }>
+}): Promise<Metadata> {
+  const { countryCode } = await props.params
+  const alternates = await buildLocalizedAlternates(countryCode, "")
+
+  const storeName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+  const title = storeName
+  const description =
+    "Shop handmade, locally sourced, and ethically produced fashion."
+
+  // Use the first catalogue product's thumbnail as the homepage OG image
+  // so social shares render a rich card rather than a plain text snippet.
+  // Falls back to the static logo.
+  const firstProductImage = await getFirstProductImageFor({ countryCode })
+  const baseUrl = getBaseURL()
+  const ogImage = firstProductImage ?? `${baseUrl}/logo.png`
+
+  return {
+    title,
+    description,
+    alternates,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      images: [{ url: ogImage, alt: title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [ogImage],
+    },
+  }
 }
 
 export default async function Home(props: {
