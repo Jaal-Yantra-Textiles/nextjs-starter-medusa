@@ -17,7 +17,17 @@ import ThemeEditorBridge from "@modules/layout/components/theme-editor-bridge"
 
 export const metadata: Metadata = {
   title: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
-  description: "A performant frontend ecommerce starter template.",
+  description: "Shop handmade, locally sourced, and ethically produced fashion.",
+  openGraph: {
+    title: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
+    description: "Shop handmade, locally sourced, and ethically produced fashion.",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
+    description: "Shop handmade, locally sourced, and ethically produced fashion.",
+  },
 }
 
 export default async function Home(props: {

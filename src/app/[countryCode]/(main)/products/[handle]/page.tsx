@@ -50,12 +50,28 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
     notFound()
   }
 
+  const description =
+    product.description?.slice(0, 160) ||
+    `Shop ${product.title} online.`
+
   return {
-    title: `${product.title} `,
-    description: `${product.title}`,
+    title: product.title,
+    description,
+    alternates: {
+      canonical: `/${params.countryCode}/products/${params.handle}`,
+    },
     openGraph: {
-      title: `${product.title} `,
-      description: `${product.title}`,
+      title: product.title,
+      description,
+      type: "website",
+      images: product.thumbnail
+        ? [{ url: product.thumbnail, alt: product.title }]
+        : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.title,
+      description,
       images: product.thumbnail ? [product.thumbnail] : [],
     },
   }

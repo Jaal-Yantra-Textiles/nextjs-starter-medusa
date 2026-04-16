@@ -28,7 +28,17 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
       title,
       description,
       alternates: {
-        canonical: `${params.category.join("/")}`,
+        canonical: `/${params.countryCode}/categories/${params.category.join("/")}`,
+      },
+      openGraph: {
+        title,
+        description,
+        type: "website",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
       },
     }
   } catch (error) {

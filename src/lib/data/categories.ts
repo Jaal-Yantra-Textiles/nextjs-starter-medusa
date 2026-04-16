@@ -9,8 +9,9 @@ export const listCategories = async (query?: Record<string, any>) => {
 
   return sdk.client
     .fetch<{ product_categories: HttpTypes.StoreProductCategory[] }>(
-      "/store/scoped-categories",
+      "/store/product-categories",
       {
+        query: { limit: 100, ...query },
         next,
         cache: "force-cache",
       }
@@ -26,13 +27,10 @@ export const getCategoryByHandle = async (categoryHandle: string[]) => {
   }
 
   return sdk.client
-    .fetch<HttpTypes.StoreProductCategoryListResponse>(
+    .fetch<{ product_categories: HttpTypes.StoreProductCategory[] }>(
       `/store/product-categories`,
       {
-        query: {
-          fields: "*category_children, *products",
-          handle,
-        },
+        query: { handle },
         next,
         cache: "force-cache",
       }

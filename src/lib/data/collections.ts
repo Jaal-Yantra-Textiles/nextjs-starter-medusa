@@ -29,13 +29,14 @@ export const listCollections = async (
 
   return sdk.client
     .fetch<{ collections: HttpTypes.StoreCollection[]; count: number }>(
-      "/store/scoped-collections",
+      "/store/collections",
       {
+        query: { limit: 100, ...queryParams },
         next,
         cache: "force-cache",
       }
     )
-    .then(({ collections }) => ({ collections, count: collections.length }))
+    .then(({ collections, count }) => ({ collections, count }))
 }
 
 export const getCollectionByHandle = async (
@@ -46,8 +47,8 @@ export const getCollectionByHandle = async (
   }
 
   return sdk.client
-    .fetch<HttpTypes.StoreCollectionListResponse>(`/store/collections`, {
-      query: { handle, fields: "*products" },
+    .fetch<{ collections: HttpTypes.StoreCollection[] }>(`/store/collections`, {
+      query: { handle },
       next,
       cache: "force-cache",
     })

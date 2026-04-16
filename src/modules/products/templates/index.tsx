@@ -36,8 +36,37 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
   const showTabs = pt?.show_tabs !== false
   const showRelated = pt?.show_related_products !== false
 
+  const lowestPrice = product.variants
+    ?.map((v: any) => v.calculated_price?.calculated_amount)
+    .filter((p: any) => p != null)
+    .sort((a: number, b: number) => a - b)[0]
+
+  const currencyCode =
+    product.variants?.[0]?.calculated_price?.currency_code || region.currency_code
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description: product.description || undefined,
+    image: product.thumbnail || undefined,
+    material: product.material || undefined,
+    ...(lowestPrice != null && {
+      offers: {
+        "@type": "Offer",
+        price: lowestPrice,
+        priceCurrency: currencyCode?.toUpperCase(),
+        availability: "https://schema.org/InStock",
+      },
+    }),
+  }
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div
         className="content-container flex flex-col small:flex-row small:items-start py-6 relative"
         data-testid="product-container"
