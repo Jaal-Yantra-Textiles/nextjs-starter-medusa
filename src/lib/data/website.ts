@@ -120,11 +120,23 @@ export type WebsiteTheme = {
   }
 }
 
+export type AnalyticsProvider = "in_house" | "custom" | "off"
+
+export type WebsiteAnalytics = {
+  provider: AnalyticsProvider
+  custom_head: string | null
+  custom_body_end: string | null
+}
+
 export type PublicWebsite = {
+  // Backend-issued website id, stamped on outbound analytics events
+  // (the in-house tracker uses this as `data-website-id`).
+  id?: string
   name: string
   domain: string
   theme?: WebsiteTheme | null
   favicon_url?: string | null
+  analytics?: WebsiteAnalytics | null
   pages: Array<PublicWebsitePage>
 }
 

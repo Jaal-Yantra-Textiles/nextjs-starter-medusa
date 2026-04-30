@@ -1,6 +1,15 @@
 import { getBaseURL } from "@lib/util/env"
+import { getWebsite, type WebsiteAnalytics } from "@lib/data/website"
+import { CustomAnalyticsInjector } from "@modules/website/components/custom-analytics-injector"
 import { Metadata } from "next"
 import "styles/globals.css"
+
+// Default in-house tracker — same CDN-hosted bundle that apps/storefront
+// uses. Override per-deployment with NEXT_PUBLIC_ANALYTICS_SCRIPT_URL if
+// a partner needs to point at a different host.
+const IN_HOUSE_SCRIPT_URL =
+  process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL ||
+  "https://automatic.jaalyantra.com/analytics.min.js"
 
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
@@ -22,9 +31,23 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout(props: { children: React.ReactNode }) {
+export default async function RootLayout(props: { children: React.ReactNode }) {
   const baseUrl = getBaseURL()
   const storeName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+
+  // Fetch the website's analytics config so we know which script(s) to
+  // inject. Failure is non-fatal — if the backend is down at build time
+  // we render the page without analytics rather than 500 the whole app.
+  let websiteId: string | undefined
+  let analytics: WebsiteAnalytics | null = null
+  try {
+    const website = await getWebsite()
+    websiteId = website.id
+    analytics = website.analytics ?? null
+  } catch {
+    // backend unreachable — proceed without analytics
+  }
+  const provider = analytics?.provider ?? "in_house"
 
   const organizationLd = {
     "@context": "https://schema.org",
@@ -52,8 +75,29 @@ export default function RootLayout(props: { children: React.ReactNode }) {
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteLd) }}
         />
+        {provider === "in_house" && websiteId && (
+          <script
+            src={IN_HOUSE_SCRIPT_URL}
+            data-website-id={websiteId}
+            defer
+          />
+        )}
       </head>
       <body>
+        {provider === "custom" && analytics?.custom_head && (
+          <CustomAnalyticsInjector
+            html={analytics.custom_head}
+            where="head"
+            marker="custom-head"
+          />
+        )}
+        {provider === "custom" && analytics?.custom_body_end && (
+          <CustomAnalyticsInjector
+            html={analytics.custom_body_end}
+            where="body-end"
+            marker="custom-body-end"
+          />
+        )}
         <main className="relative">{props.children}</main>
       </body>
     </html>
