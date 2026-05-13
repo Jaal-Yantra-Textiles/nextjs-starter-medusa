@@ -149,6 +149,9 @@ export type WebsiteTheme = {
     empty_cta_link?: string
     show_sign_in_prompt?: boolean
     checkout_button_text?: string
+    show_order_summary?: boolean
+    show_free_shipping_bar?: boolean
+    free_shipping_threshold?: string
   }
 }
 
