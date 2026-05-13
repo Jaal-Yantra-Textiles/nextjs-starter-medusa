@@ -10,18 +10,25 @@ export default function ThemeStyles({ theme }: { theme?: WebsiteTheme | null }) 
   const colors = theme?.colors
   const animations = theme?.animations
   const typography = theme?.typography
+  const buttons = theme?.buttons
 
   const vars: string[] = []
   if (colors?.primary) vars.push(`--theme-primary: ${colors.primary};`)
+  if (colors?.secondary) vars.push(`--theme-secondary: ${colors.secondary};`)
   if (colors?.background) vars.push(`--theme-background: ${colors.background};`)
   if (colors?.text) vars.push(`--theme-text: ${colors.text};`)
   if (colors?.accent) vars.push(`--theme-accent: ${colors.accent};`)
+  if (colors?.muted) vars.push(`--theme-muted: ${colors.muted};`)
+  if (colors?.border) vars.push(`--theme-border: ${colors.border};`)
 
   // Typography
   if (typography?.font_family) vars.push(`--theme-font-family: ${typography.font_family}, sans-serif;`)
   if (typography?.heading_font_family) vars.push(`--theme-heading-font-family: ${typography.heading_font_family}, sans-serif;`)
   if (typography?.base_font_size) vars.push(`--theme-base-font-size: ${typography.base_font_size};`)
   if (typography?.heading_weight) vars.push(`--theme-heading-weight: ${typography.heading_weight};`)
+
+  // Buttons
+  if (buttons?.border_radius) vars.push(`--theme-button-radius: ${buttons.border_radius};`)
 
   // Animation duration
   const duration = DURATION_MAP[animations?.global_duration || "normal"] || "0.6s"
@@ -38,6 +45,13 @@ export default function ThemeStyles({ theme }: { theme?: WebsiteTheme | null }) 
   }
   if (typography?.heading_font_family || typography?.heading_weight) {
     rules.push(`h1, h2, h3, h4, h5, h6 { ${typography.heading_font_family ? `font-family: var(--theme-heading-font-family);` : ""} ${typography.heading_weight ? `font-weight: var(--theme-heading-weight);` : ""} }`)
+  }
+  // Apply button radius to native buttons and link-buttons that opt in.
+  // Components can opt out with the .no-theme-radius class on a per-button basis.
+  if (buttons?.border_radius) {
+    rules.push(
+      `button:not(.no-theme-radius), [role="button"]:not(.no-theme-radius), [data-theme-button]:not(.no-theme-radius) { border-radius: var(--theme-button-radius); }`
+    )
   }
 
   // Load Google Fonts for non-system fonts

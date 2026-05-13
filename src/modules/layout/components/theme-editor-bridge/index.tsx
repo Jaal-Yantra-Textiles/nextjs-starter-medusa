@@ -14,6 +14,7 @@ type ThemeEditorMessage =
         | "footer"
         | "animations"
         | "typography"
+        | "buttons"
         | "trust_banner"
         | "text_with_image"
         | "testimonials"
@@ -36,9 +37,22 @@ export default function ThemeEditorBridge() {
   const updateColors = useCallback((data: Record<string, unknown>) => {
     const root = document.documentElement
     if (data.primary) root.style.setProperty("--theme-primary", data.primary as string)
+    if (data.secondary) root.style.setProperty("--theme-secondary", data.secondary as string)
     if (data.background) root.style.setProperty("--theme-background", data.background as string)
     if (data.text) root.style.setProperty("--theme-text", data.text as string)
     if (data.accent) root.style.setProperty("--theme-accent", data.accent as string)
+    if (data.muted) root.style.setProperty("--theme-muted", data.muted as string)
+    if (data.border) root.style.setProperty("--theme-border", data.border as string)
+  }, [])
+
+  const updateButtons = useCallback((data: Record<string, unknown>) => {
+    const root = document.documentElement
+    if (data.border_radius !== undefined) {
+      root.style.setProperty(
+        "--theme-button-radius",
+        (data.border_radius as string) || "0px"
+      )
+    }
   }, [])
 
   const updateBranding = useCallback((data: Record<string, unknown>) => {
@@ -64,6 +78,18 @@ export default function ThemeEditorBridge() {
         link.textContent = data.store_name as string
       }
     })
+
+    // Update favicon live so editor previews work without a reload.
+    if (data.favicon_url !== undefined) {
+      const href = (data.favicon_url as string) || "/favicon.ico"
+      let link = document.querySelector("link[rel='icon']") as HTMLLinkElement | null
+      if (!link) {
+        link = document.createElement("link")
+        link.rel = "icon"
+        document.head.appendChild(link)
+      }
+      link.href = href
+    }
   }, [])
 
   const updateHero = useCallback((data: Record<string, unknown>) => {
@@ -268,6 +294,9 @@ export default function ThemeEditorBridge() {
           case "branding":
             updateBranding(msg.data)
             break
+          case "buttons":
+            updateButtons(msg.data)
+            break
           case "hero":
             updateHero(msg.data)
             break
@@ -293,7 +322,7 @@ export default function ThemeEditorBridge() {
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [updateColors, updateBranding, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText])
+  }, [updateColors, updateBranding, updateButtons, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText])
 
   // Inject editor outline styles for sections
   useEffect(() => {

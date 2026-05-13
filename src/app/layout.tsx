@@ -1,5 +1,5 @@
 import { getBaseURL } from "@lib/util/env"
-import { getWebsite, type WebsiteAnalytics } from "@lib/data/website"
+import { getWebsite, type WebsiteAnalytics, type WebsiteTheme } from "@lib/data/website"
 import { CustomAnalyticsInjector } from "@modules/website/components/custom-analytics-injector"
 import { Metadata } from "next"
 import "styles/globals.css"
@@ -11,24 +11,42 @@ const IN_HOUSE_SCRIPT_URL =
   process.env.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL ||
   "https://automatic.jaalyantra.com/analytics.min.js"
 
-export const metadata: Metadata = {
-  metadataBase: new URL(getBaseURL()),
-  title: {
-    default: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
-    template: `%s | ${process.env.NEXT_PUBLIC_STORE_NAME || "Store"}`,
-  },
-  description: "Shop handmade, locally sourced, and ethically produced fashion.",
-  openGraph: {
-    type: "website",
-    siteName: process.env.NEXT_PUBLIC_STORE_NAME || "Store",
-  },
-  twitter: {
-    card: "summary_large_image",
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
+const DEFAULT_DESCRIPTION =
+  "Shop handmade, locally sourced, and ethically produced fashion."
+
+export async function generateMetadata(): Promise<Metadata> {
+  const envStoreName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+  let theme: WebsiteTheme | null = null
+  try {
+    const website = await getWebsite()
+    theme = website.theme ?? null
+  } catch {
+    // backend unreachable — fall back to env-derived defaults
+  }
+  const storeName = theme?.branding?.store_name || envStoreName
+  const description = theme?.branding?.tagline || DEFAULT_DESCRIPTION
+  const faviconUrl = theme?.branding?.favicon_url
+
+  return {
+    metadataBase: new URL(getBaseURL()),
+    title: {
+      default: storeName,
+      template: `%s | ${storeName}`,
+    },
+    description,
+    icons: faviconUrl ? { icon: faviconUrl } : undefined,
+    openGraph: {
+      type: "website",
+      siteName: storeName,
+    },
+    twitter: {
+      card: "summary_large_image",
+    },
+    robots: {
+      index: true,
+      follow: true,
+    },
+  }
 }
 
 export default async function RootLayout(props: { children: React.ReactNode }) {

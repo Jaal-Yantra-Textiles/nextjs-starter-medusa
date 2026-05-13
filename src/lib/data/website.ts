@@ -15,8 +15,21 @@ export type AnimationType =
   | "zoom-out"
 
 export type WebsiteTheme = {
-  branding?: { logo_url?: string; store_name?: string; favicon_url?: string }
-  colors?: { primary?: string; background?: string; text?: string; accent?: string }
+  branding?: {
+    logo_url?: string
+    store_name?: string
+    favicon_url?: string
+    tagline?: string
+  }
+  colors?: {
+    primary?: string
+    secondary?: string
+    background?: string
+    text?: string
+    accent?: string
+    muted?: string
+    border?: string
+  }
   typography?: {
     font_family?: string
     heading_font_family?: string
