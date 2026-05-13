@@ -6,12 +6,14 @@ import Refresh from "@modules/common/icons/refresh"
 
 import Accordion from "./accordion"
 import { HttpTypes } from "@medusajs/types"
+import { Heading, Tabs } from "@medusajs/ui"
 
 type ProductTabsProps = {
   product: HttpTypes.StoreProduct
+  layout?: "accordion" | "tabs" | "stacked"
 }
 
-const ProductTabs = ({ product }: ProductTabsProps) => {
+const ProductTabs = ({ product, layout = "accordion" }: ProductTabsProps) => {
   const tabs = [
     {
       label: "Product Information",
@@ -23,8 +25,44 @@ const ProductTabs = ({ product }: ProductTabsProps) => {
     },
   ]
 
+  if (layout === "tabs") {
+    return (
+      <div className="w-full" data-description-layout="tabs">
+        <Tabs defaultValue={tabs[0].label}>
+          <Tabs.List>
+            {tabs.map((t) => (
+              <Tabs.Trigger key={t.label} value={t.label}>
+                {t.label}
+              </Tabs.Trigger>
+            ))}
+          </Tabs.List>
+          {tabs.map((t) => (
+            <Tabs.Content key={t.label} value={t.label}>
+              {t.component}
+            </Tabs.Content>
+          ))}
+        </Tabs>
+      </div>
+    )
+  }
+
+  if (layout === "stacked") {
+    return (
+      <div className="w-full flex flex-col gap-y-8" data-description-layout="stacked">
+        {tabs.map((t) => (
+          <section key={t.label}>
+            <Heading level="h3" className="txt-large mb-3">
+              {t.label}
+            </Heading>
+            {t.component}
+          </section>
+        ))}
+      </div>
+    )
+  }
+
   return (
-    <div className="w-full">
+    <div className="w-full" data-description-layout="accordion">
       <Accordion type="multiple">
         {tabs.map((tab, i) => (
           <Accordion.Item

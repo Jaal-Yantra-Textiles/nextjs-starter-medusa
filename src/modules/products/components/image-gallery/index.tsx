@@ -1,16 +1,26 @@
 import { HttpTypes } from "@medusajs/types"
-import { Container } from "@medusajs/ui"
+import { Container, clx } from "@medusajs/ui"
 import Image from "next/image"
 
 type ImageGalleryProps = {
   images: HttpTypes.StoreProductImage[]
+  layout?: "gallery" | "single" | "grid"
 }
 
-const ImageGallery = ({ images }: ImageGalleryProps) => {
+const ImageGallery = ({ images, layout = "gallery" }: ImageGalleryProps) => {
+  const displayed = layout === "single" ? images.slice(0, 1) : images
+
   return (
-    <div className="flex items-start relative">
-      <div className="flex flex-col flex-1 small:mx-16 gap-y-4">
-        {images.map((image, index) => {
+    <div className="flex items-start relative" data-image-layout={layout}>
+      <div
+        className={clx(
+          "flex-1 small:mx-16",
+          layout === "grid"
+            ? "grid grid-cols-1 small:grid-cols-2 gap-4"
+            : "flex flex-col gap-y-4"
+        )}
+      >
+        {displayed.map((image, index) => {
           return (
             <Container
               key={image.id}

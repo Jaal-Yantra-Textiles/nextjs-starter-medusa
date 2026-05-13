@@ -133,6 +133,11 @@ export type WebsiteTheme = {
     related_heading?: string
     show_tabs?: boolean
     show_breadcrumbs?: boolean
+    show_sku?: boolean
+    show_stock_status?: boolean
+    image_layout?: "gallery" | "single" | "grid"
+    gallery_position?: "left" | "right"
+    description_layout?: "tabs" | "accordion" | "stacked"
     cta_text?: string
     sample_product_name?: string
     sample_product_price?: string
