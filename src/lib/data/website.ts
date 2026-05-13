@@ -71,7 +71,14 @@ export type WebsiteTheme = {
     sticky?: boolean
     style?: "transparent" | "solid" | "bordered"
   }
-  footer?: { text?: string; social_links?: Array<{ platform: string; url: string }> }
+  footer?: {
+    text?: string
+    copyright_text?: string
+    social_links?: Array<{ platform: string; url: string }>
+    show_newsletter?: boolean
+    newsletter_heading?: string
+    newsletter_description?: string
+  }
   home_sections?: {
     show_featured_collections?: boolean
     featured_collection_count?: number

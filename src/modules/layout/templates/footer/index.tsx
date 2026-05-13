@@ -2,7 +2,7 @@ import { listCategories } from "@lib/data/categories"
 import { listCollections } from "@lib/data/collections"
 import { STORE_NAME } from "@lib/constants"
 import { WebsiteTheme } from "@lib/data/website"
-import { Text, clx } from "@medusajs/ui"
+import { Button, Heading, Input, Text, clx } from "@medusajs/ui"
 
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 
@@ -24,10 +24,54 @@ export default async function Footer({ theme }: { theme?: WebsiteTheme | null })
   const storeName = theme?.branding?.store_name || STORE_NAME
   const footerText = theme?.footer?.text
   const socialLinks = theme?.footer?.social_links
+  const showNewsletter = theme?.footer?.show_newsletter ?? false
+  const newsletterHeading =
+    theme?.footer?.newsletter_heading || "Stay in the loop"
+  const newsletterDescription =
+    theme?.footer?.newsletter_description ||
+    "Sign up for occasional updates on new arrivals and offers."
+  const copyrightText = theme?.footer?.copyright_text
+  const defaultCopyright = `© ${new Date().getFullYear()} ${storeName}. ${
+    footerText || "All rights reserved."
+  }`
 
   return (
     <footer className="border-t border-ui-border-base w-full" data-theme-section="footer">
       <div className="content-container flex flex-col w-full">
+        <section
+          className={clx(
+            "flex flex-col gap-y-4 py-12 border-b border-ui-border-base",
+            !showNewsletter && "hidden"
+          )}
+          data-theme-section="footer-newsletter"
+          aria-label="Newsletter signup"
+        >
+          <Heading level="h2" className="txt-large" data-theme-el="newsletter-heading">
+            {newsletterHeading}
+          </Heading>
+          <Text
+            className="text-ui-fg-subtle max-w-prose"
+            data-theme-el="newsletter-description"
+          >
+            {newsletterDescription}
+          </Text>
+          <form
+            className="flex flex-col xsmall:flex-row gap-2 max-w-md"
+            method="POST"
+            action="/api/newsletter"
+          >
+            <Input
+              type="email"
+              name="email"
+              required
+              placeholder="you@example.com"
+              aria-label="Email address"
+            />
+            <Button type="submit" variant="primary">
+              Subscribe
+            </Button>
+          </form>
+        </section>
         <div className="flex flex-col gap-y-6 xsmall:flex-row items-start justify-between py-40">
           <div>
             <LocalizedClientLink
@@ -160,8 +204,7 @@ export default async function Footer({ theme }: { theme?: WebsiteTheme | null })
         </div>
         <div className="flex w-full mb-16 justify-between text-ui-fg-muted">
           <Text className="txt-compact-small" data-theme-section="footer-text">
-            &copy; {new Date().getFullYear()} {storeName}.{" "}
-            {footerText || "All rights reserved."}
+            {copyrightText || defaultCopyright}
           </Text>
         </div>
       </div>

@@ -196,12 +196,39 @@ export default function ThemeEditorBridge() {
   }, [])
 
   const updateFooter = useCallback((data: Record<string, unknown>) => {
-    if (data.text !== undefined) {
-      const footerText = document.querySelector("[data-theme-section='footer-text']")
-      if (footerText) {
-        const storeName = footerText.textContent?.split(".")[0] || ""
-        footerText.textContent = `${storeName}. ${data.text || "All rights reserved."}`
-      }
+    const footerTextEl = document.querySelector(
+      "[data-theme-section='footer-text']"
+    ) as HTMLElement | null
+
+    // Explicit override wins. The bridge can't reconstruct the default
+    // "© YYYY StoreName. ..." string when copyright_text is cleared
+    // because YYYY and the store name aren't in the data payload — the
+    // partner will see the original until the iframe reloads on save.
+    if (data.copyright_text !== undefined && footerTextEl) {
+      const value = data.copyright_text as string
+      if (value) footerTextEl.textContent = value
+    }
+
+    if (data.text !== undefined && footerTextEl && !data.copyright_text) {
+      const storeName = footerTextEl.textContent?.split(".")[0] || ""
+      footerTextEl.textContent = `${storeName}. ${
+        data.text || "All rights reserved."
+      }`
+    }
+
+    const newsletterSection = document.querySelector(
+      "[data-theme-section='footer-newsletter']"
+    ) as HTMLElement | null
+    if (data.show_newsletter !== undefined && newsletterSection) {
+      newsletterSection.classList.toggle("hidden", !data.show_newsletter)
+    }
+    if (data.newsletter_heading !== undefined) {
+      const h = document.querySelector("[data-theme-el='newsletter-heading']")
+      if (h) h.textContent = data.newsletter_heading as string
+    }
+    if (data.newsletter_description !== undefined) {
+      const d = document.querySelector("[data-theme-el='newsletter-description']")
+      if (d) d.textContent = data.newsletter_description as string
     }
   }, [])
 
