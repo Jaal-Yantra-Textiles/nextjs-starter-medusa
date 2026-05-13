@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useCallback } from "react"
+import { useEffect, useCallback, useRef } from "react"
 
 type ThemeEditorMessage =
   | { type: "THEME_EDITOR_INIT" }
@@ -15,6 +15,7 @@ type ThemeEditorMessage =
         | "animations"
         | "typography"
         | "buttons"
+        | "home_sections"
         | "trust_banner"
         | "text_with_image"
         | "testimonials"
@@ -355,6 +356,60 @@ export default function ThemeEditorBridge() {
     []
   )
 
+  // Soft-reload helper. Used when a payload touches DOM structure we don't
+  // have selectors for (items[], image swaps, sections_order, layout enums).
+  // Debounced so a flurry of edits doesn't reload mid-keystroke.
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleReload = useCallback(() => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current)
+    reloadTimer.current = setTimeout(() => {
+      window.location.reload()
+    }, 1200)
+  }, [])
+
+  // Keys we can update in-place via updateSectionText (text-only scalars).
+  // Anything outside this set inside a sub-section payload triggers a reload.
+  const TEXT_KEYS = useRef(new Set(["title", "heading", "description"]))
+  const SUB_SECTION_KEYS = useRef<Array<
+    "trust_banner" | "text_with_image" | "testimonials" | "banner" | "newsletter"
+  >>([
+    "trust_banner",
+    "text_with_image",
+    "testimonials",
+    "banner",
+    "newsletter",
+  ])
+
+  const updateHomeSections = useCallback(
+    (data: Record<string, unknown>) => {
+      // sections_order changes the rendered order of homepage sections —
+      // not safely live-patchable, schedule a reload.
+      if ("sections_order" in data) {
+        scheduleReload()
+      }
+
+      let needsReload = false
+      for (const subKey of SUB_SECTION_KEYS.current) {
+        const sub = data[subKey] as Record<string, unknown> | undefined
+        if (!sub) continue
+
+        // Apply text scalars live.
+        updateSectionText(subKey, sub)
+
+        // Anything beyond text keys we can't patch in-place — items[],
+        // image_url, background, layout enums, CTAs all change structure.
+        for (const k of Object.keys(sub)) {
+          if (!TEXT_KEYS.current.has(k)) {
+            needsReload = true
+            break
+          }
+        }
+      }
+      if (needsReload) scheduleReload()
+    },
+    [updateSectionText, scheduleReload]
+  )
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ThemeEditorMessage>) => {
       const msg = event.data
@@ -391,6 +446,9 @@ export default function ThemeEditorBridge() {
           case "typography":
             updateTypography(msg.data)
             break
+          case "home_sections":
+            updateHomeSections(msg.data)
+            break
           case "trust_banner":
           case "text_with_image":
           case "testimonials":
@@ -404,7 +462,7 @@ export default function ThemeEditorBridge() {
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [updateColors, updateBranding, updateButtons, updateNavigation, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText])
+  }, [updateColors, updateBranding, updateButtons, updateNavigation, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText, updateHomeSections])
 
   // Inject editor outline styles for sections
   useEffect(() => {
