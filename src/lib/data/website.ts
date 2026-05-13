@@ -63,7 +63,14 @@ export type WebsiteTheme = {
     secondary_cta_link?: string
     features?: Array<{ icon?: string; title: string; description?: string }>
   }
-  navigation?: { links?: Array<{ label: string; href: string }>; show_account_link?: boolean }
+  navigation?: {
+    links?: Array<{ label: string; href: string }>
+    show_account_link?: boolean
+    show_cart_icon?: boolean
+    show_search?: boolean
+    sticky?: boolean
+    style?: "transparent" | "solid" | "bordered"
+  }
   footer?: { text?: string; social_links?: Array<{ platform: string; url: string }> }
   home_sections?: {
     show_featured_collections?: boolean

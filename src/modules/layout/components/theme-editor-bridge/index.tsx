@@ -55,6 +55,58 @@ export default function ThemeEditorBridge() {
     }
   }, [])
 
+  const updateNavigation = useCallback((data: Record<string, unknown>) => {
+    const navSection = document.querySelector(
+      "[data-theme-section='nav']"
+    ) as HTMLElement | null
+    if (!navSection) return
+
+    if (data.sticky !== undefined) {
+      const isSticky = Boolean(data.sticky)
+      navSection.dataset.navSticky = isSticky ? "true" : "false"
+      ;["sticky", "top-0", "inset-x-0", "z-50"].forEach((c) =>
+        navSection.classList.toggle(c, isSticky)
+      )
+    }
+
+    if (data.style !== undefined) {
+      const style = (data.style as string) || "bordered"
+      navSection.dataset.navStyle = style
+      const header = navSection.querySelector("header") as HTMLElement | null
+      if (header) {
+        header.classList.toggle("bg-white", style !== "transparent")
+        header.classList.toggle("border-b", style === "bordered")
+        header.classList.toggle("border-ui-border-base", style === "bordered")
+      }
+    }
+
+    if (data.show_cart_icon !== undefined) {
+      const cartWrap = navSection.querySelector(
+        "[data-nav-cart-wrapper]"
+      ) as HTMLElement | null
+      if (cartWrap) cartWrap.classList.toggle("hidden", !data.show_cart_icon)
+    }
+
+    if (data.show_search !== undefined) {
+      const searchEl = navSection.querySelector(
+        "[data-nav-search]"
+      ) as HTMLElement | null
+      if (searchEl) {
+        searchEl.classList.toggle("hidden", !data.show_search)
+        searchEl.classList.toggle("flex", Boolean(data.show_search))
+      }
+    }
+
+    if (data.show_account_link !== undefined) {
+      const accountEl = navSection.querySelector(
+        "[data-testid='nav-account-link']"
+      ) as HTMLElement | null
+      if (accountEl) {
+        accountEl.classList.toggle("hidden", !data.show_account_link)
+      }
+    }
+  }, [])
+
   const updateBranding = useCallback((data: Record<string, unknown>) => {
     const navLink = document.querySelector("[data-testid='nav-store-link']")
     if (navLink) {
@@ -297,6 +349,9 @@ export default function ThemeEditorBridge() {
           case "buttons":
             updateButtons(msg.data)
             break
+          case "navigation":
+            updateNavigation(msg.data)
+            break
           case "hero":
             updateHero(msg.data)
             break
@@ -322,7 +377,7 @@ export default function ThemeEditorBridge() {
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [updateColors, updateBranding, updateButtons, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText])
+  }, [updateColors, updateBranding, updateButtons, updateNavigation, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText])
 
   // Inject editor outline styles for sections
   useEffect(() => {
