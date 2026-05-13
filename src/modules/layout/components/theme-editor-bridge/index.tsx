@@ -16,6 +16,8 @@ type ThemeEditorMessage =
         | "typography"
         | "buttons"
         | "home_sections"
+        | "product_page"
+        | "cart"
         | "trust_banner"
         | "text_with_image"
         | "testimonials"
@@ -410,6 +412,87 @@ export default function ThemeEditorBridge() {
     [updateSectionText, scheduleReload]
   )
 
+  const updateProductPage = useCallback(
+    (data: Record<string, unknown>) => {
+      // Live updates for the obvious text scalars; everything else is a
+      // boolean toggle or layout enum that's easier to land via reload.
+      if (data.cta_text !== undefined) {
+        const btn = document.querySelector(
+          "[data-testid='product-actions'] button, [data-testid='product-actions'] [type='submit']"
+        ) as HTMLElement | null
+        if (btn) btn.textContent = (data.cta_text as string) || btn.textContent
+      }
+      if (data.related_heading !== undefined) {
+        const heading = document.querySelector(
+          "[data-testid='related-products-container'] h2, [data-testid='related-products-container'] h3"
+        ) as HTMLElement | null
+        if (heading) heading.textContent = data.related_heading as string
+      }
+
+      // sample_product_name / sample_product_price are editor-only mockup
+      // labels; ignore on the storefront side.
+      const liveKeys = new Set([
+        "cta_text",
+        "related_heading",
+        "sample_product_name",
+        "sample_product_price",
+      ])
+      for (const k of Object.keys(data)) {
+        if (!liveKeys.has(k)) {
+          scheduleReload()
+          break
+        }
+      }
+    },
+    [scheduleReload]
+  )
+
+  const updateCart = useCallback(
+    (data: Record<string, unknown>) => {
+      // Live updates for cart's text scalars.
+      const cartSection = document.querySelector(
+        "[data-theme-section='cart']"
+      ) as HTMLElement | null
+
+      if (data.heading !== undefined && cartSection) {
+        const h = cartSection.querySelector("h1, h2") as HTMLElement | null
+        if (h) h.textContent = data.heading as string
+      }
+      if (data.empty_message !== undefined && cartSection) {
+        const p = cartSection.querySelector(
+          "[data-testid='cart-empty-message'], p"
+        ) as HTMLElement | null
+        if (p) p.textContent = data.empty_message as string
+      }
+      if (data.empty_cta_text !== undefined && cartSection) {
+        const a = cartSection.querySelector(
+          "[data-testid='cart-empty-cta'], a"
+        ) as HTMLElement | null
+        if (a) a.textContent = data.empty_cta_text as string
+      }
+      if (data.checkout_button_text !== undefined) {
+        const btn = document.querySelector(
+          "[data-testid='checkout-button']"
+        ) as HTMLElement | null
+        if (btn) btn.textContent = data.checkout_button_text as string
+      }
+
+      const liveKeys = new Set([
+        "heading",
+        "empty_message",
+        "empty_cta_text",
+        "checkout_button_text",
+      ])
+      for (const k of Object.keys(data)) {
+        if (!liveKeys.has(k)) {
+          scheduleReload()
+          break
+        }
+      }
+    },
+    [scheduleReload]
+  )
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ThemeEditorMessage>) => {
       const msg = event.data
@@ -449,6 +532,12 @@ export default function ThemeEditorBridge() {
           case "home_sections":
             updateHomeSections(msg.data)
             break
+          case "product_page":
+            updateProductPage(msg.data)
+            break
+          case "cart":
+            updateCart(msg.data)
+            break
           case "trust_banner":
           case "text_with_image":
           case "testimonials":
@@ -462,7 +551,7 @@ export default function ThemeEditorBridge() {
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [updateColors, updateBranding, updateButtons, updateNavigation, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText, updateHomeSections])
+  }, [updateColors, updateBranding, updateButtons, updateNavigation, updateHero, updateFooter, updateAnimations, updateTypography, updateSectionText, updateHomeSections, updateProductPage, updateCart])
 
   // Inject editor outline styles for sections
   useEffect(() => {
