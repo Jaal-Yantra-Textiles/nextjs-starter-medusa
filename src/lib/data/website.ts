@@ -100,6 +100,10 @@ export type WebsiteTheme = {
     trust_banner?: {
       items?: Array<{ icon?: string; text: string }>
       background?: string
+      // Optional explicit text colour (hex). When omitted, the
+      // renderer auto-picks light/dark text based on `background`
+      // luminance so a dark bg doesn't render unreadable dark text.
+      text_color?: string
     }
     text_with_image?: {
       title?: string
@@ -118,6 +122,10 @@ export type WebsiteTheme = {
       description?: string
       background_image_url?: string
       background_color?: string
+      // Optional explicit text colour (hex). When omitted, the
+      // renderer auto-picks light/dark text based on
+      // `background_color` luminance.
+      text_color?: string
       cta_text?: string
       cta_link?: string
     }

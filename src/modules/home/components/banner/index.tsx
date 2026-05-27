@@ -1,5 +1,6 @@
 import { WebsiteTheme } from "@lib/data/website"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
+import { isDarkColor, pickTextColor, pickSubtitleColor } from "@lib/util/theme-color"
 
 export default function Banner({
   theme,
@@ -13,6 +14,7 @@ export default function Banner({
   const description = config?.description
   const bgImage = config?.background_image_url
   const bgColor = config?.background_color
+  const textOverride = (config as any)?.text_color as string | undefined
   const ctaText = config?.cta_text
   const ctaLink = config?.cta_link || "/store"
 
@@ -21,8 +23,14 @@ export default function Banner({
   if (!title && !description && !isThemeEditor) return null
 
   const hasBgImage = !!bgImage
-  const textColor = hasBgImage ? "text-white" : "text-ui-fg-base"
-  const subtitleColor = hasBgImage ? "text-white/80" : "text-ui-fg-subtle"
+  // Effective bg "darkness" for text-color decisions:
+  // - image bg → always treat as dark (we render an overlay below)
+  // - solid color → use luminance
+  // - neither → falls back to var(--theme-primary, #7c3aed), which is
+  //   dark by default — preserve old behavior.
+  const isDark = hasBgImage || isDarkColor(bgColor) || !bgColor
+  const titleColor = pickTextColor(isDark ? "#000000" : bgColor, textOverride)
+  const subtitleColor = pickSubtitleColor(isDark ? "#000000" : bgColor, textOverride)
 
   return (
     <div className="w-full" {...sectionAttrs}>
@@ -48,18 +56,16 @@ export default function Banner({
         <div className="relative z-10 content-container text-center">
           {title && (
             <h2
-              className={`text-2xl small:text-4xl font-semibold mb-4 ${
-                hasBgImage || !bgColor ? "text-white" : textColor
-              }`}
+              className={`text-2xl small:text-4xl font-semibold mb-4 ${titleColor.className}`}
+              style={titleColor.style}
             >
               {title}
             </h2>
           )}
           {description && (
             <p
-              className={`text-base small:text-lg max-w-2xl mx-auto mb-8 ${
-                hasBgImage || !bgColor ? "text-white/80" : subtitleColor
-              }`}
+              className={`text-base small:text-lg max-w-2xl mx-auto mb-8 ${subtitleColor.className}`}
+              style={subtitleColor.style}
             >
               {description}
             </p>
@@ -68,7 +74,7 @@ export default function Banner({
             <LocalizedClientLink
               href={ctaLink}
               className={`inline-block px-8 py-3 rounded-md font-medium transition-opacity hover:opacity-90 ${
-                hasBgImage || !bgColor
+                isDark
                   ? "bg-white text-ui-fg-base"
                   : "bg-theme-primary text-white"
               }`}

@@ -1,4 +1,5 @@
 import { WebsiteTheme } from "@lib/data/website"
+import { pickTextColor } from "@lib/util/theme-color"
 
 export default function TrustBanner({
   theme,
@@ -10,6 +11,10 @@ export default function TrustBanner({
   const config = theme?.home_sections?.trust_banner
   const items = config?.items
   const bgColor = config?.background
+  // Auto-flip text to white when bg is dark; partner can override via
+  // `text_color`. Without this a dark bg renders dark default text and
+  // the band reads as a blank stripe.
+  const text = pickTextColor(bgColor, (config as any)?.text_color)
 
   const sectionAttrs = isThemeEditor ? { "data-theme-section": "trust_banner" } : {}
 
@@ -47,7 +52,8 @@ export default function TrustBanner({
           {displayItems.map((item, i) => (
             <div
               key={i}
-              className="flex items-center justify-center gap-2 py-2 text-sm text-ui-fg-base"
+              className={`flex items-center justify-center gap-2 py-2 text-sm ${text.className}`}
+              style={text.style}
             >
               {item.icon && <span className="text-lg flex-shrink-0">{item.icon}</span>}
               <span className="font-medium">{item.text}</span>
