@@ -33,6 +33,22 @@ export const getCacheTag = async (tag: string): Promise<string> => {
   }
 }
 
+/**
+ * Returns the visitor's geo-IP country code when it isn't covered by any of
+ * the store's regions (set by middleware), otherwise undefined. Product pages
+ * use this to distinguish "we don't ship here yet" (CASE A) from
+ * "prices coming soon" (CASE B).
+ */
+export const getGeoUnservedCountry = async (): Promise<string | undefined> => {
+  try {
+    const cookies = await nextCookies()
+    const value = cookies.get("_medusa_geo_unserved")?.value
+    return value || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export const getCacheOptions = async (
   tag: string
 ): Promise<{ tags: string[] } | {}> => {

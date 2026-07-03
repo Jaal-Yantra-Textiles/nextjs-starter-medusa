@@ -10,6 +10,7 @@ import { isEqual } from "lodash"
 import { useParams, usePathname, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import ProductPrice from "../product-price"
+import PriceComingSoon from "../price-coming-soon"
 import RegionNotServedFallback from "../region-not-served-fallback"
 import MobileActions from "./mobile-actions"
 import { useRouter } from "next/navigation"
@@ -19,6 +20,10 @@ type ProductActionsProps = {
   region: HttpTypes.StoreRegion
   disabled?: boolean
   ctaText?: string
+  // Visitor's real (geo-IP) country when it isn't served by any region —
+  // set by middleware, threaded in from ProductActionsWrapper. Drives the
+  // CASE A vs CASE B choice when a product has no price.
+  unservedCountry?: string
 }
 
 const optionsAsKeymap = (
@@ -34,6 +39,7 @@ export default function ProductActions({
   product,
   disabled,
   ctaText,
+  unservedCountry,
 }: ProductActionsProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -123,11 +129,11 @@ export default function ProductActions({
 
   const inView = useIntersection(actionsRef, "0px")
 
-  // True when NO variant has a calculated_price for the visitor's
-  // region — either the partner doesn't ship to this country, or the
-  // FX fanout hasn't created prices in the region's currency yet.
-  // When false we render the price + add-to-cart; when true we swap
-  // the commerce block for the contact-us fallback.
+  // True when at least one variant has a calculated_price for the visitor's
+  // region. When false we can't show a price or add-to-cart, so we swap the
+  // commerce block for a fallback: "we don't ship here yet" if the visitor's
+  // real country isn't served (CASE A), otherwise "prices coming soon" for a
+  // served region whose price simply hasn't been finalised (CASE B).
   const hasAnyPrice = useMemo(() => {
     return (product.variants ?? []).some(
       (v: any) => v?.calculated_price?.calculated_amount != null
@@ -152,7 +158,16 @@ export default function ProductActions({
   if (!hasAnyPrice) {
     return (
       <div className="flex flex-col gap-y-2" ref={actionsRef}>
-        <RegionNotServedFallback product={product} countryCode={countryCode} />
+        {unservedCountry ? (
+          // CASE A — the visitor's real country isn't covered by any region.
+          <RegionNotServedFallback
+            product={product}
+            countryCode={unservedCountry}
+          />
+        ) : (
+          // CASE B — region is served, price just isn't finalised yet.
+          <PriceComingSoon />
+        )}
       </div>
     )
   }

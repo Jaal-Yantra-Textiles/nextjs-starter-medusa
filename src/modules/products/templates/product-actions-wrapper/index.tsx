@@ -1,4 +1,5 @@
 import { listProducts } from "@lib/data/products"
+import { getGeoUnservedCountry } from "@lib/data/cookies"
 import { HttpTypes } from "@medusajs/types"
 import ProductActions from "@modules/products/components/product-actions"
 
@@ -14,14 +15,24 @@ export default async function ProductActionsWrapper({
   region: HttpTypes.StoreRegion
   ctaText?: string
 }) {
-  const product = await listProducts({
-    queryParams: { id: [id] },
-    regionId: region.id,
-  }).then(({ response }) => response.products[0])
+  const [product, unservedCountry] = await Promise.all([
+    listProducts({
+      queryParams: { id: [id] },
+      regionId: region.id,
+    }).then(({ response }) => response.products[0]),
+    getGeoUnservedCountry(),
+  ])
 
   if (!product) {
     return null
   }
 
-  return <ProductActions product={product} region={region} ctaText={ctaText} />
+  return (
+    <ProductActions
+      product={product}
+      region={region}
+      ctaText={ctaText}
+      unservedCountry={unservedCountry}
+    />
+  )
 }

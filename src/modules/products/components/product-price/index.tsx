@@ -1,4 +1,4 @@
-import { clx } from "@medusajs/ui"
+import { clx, Text } from "@medusajs/ui"
 
 import { getProductPrice } from "@lib/util/get-product-price"
 import { HttpTypes } from "@medusajs/types"
@@ -17,8 +17,19 @@ export default function ProductPrice({
 
   const selectedPrice = variant ? variantPrice : cheapestPrice
 
+  // The product has priced variants (ProductActions only renders us when at
+  // least one does), but this specific selected option has no price yet. Show
+  // a "coming soon" note rather than an animated skeleton that never resolves.
   if (!selectedPrice) {
-    return <div className="block w-32 h-9 bg-gray-100 animate-pulse" />
+    return (
+      <Text
+        className="text-ui-fg-subtle"
+        size="small"
+        data-testid="variant-price-coming-soon"
+      >
+        Price coming soon for this option
+      </Text>
+    )
   }
 
   return (

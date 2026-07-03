@@ -121,6 +121,32 @@ export async function middleware(request: NextRequest) {
 
   const countryCode = regionMap && (await getCountryCode(request, regionMap))
 
+  // Detect visitors whose real (geo-IP) country isn't covered by ANY of the
+  // store's regions. getCountryCode() silently coerces them into a fallback
+  // region so the site still works, which erases the fact that we don't
+  // actually ship there. We persist that fact in a cookie so product pages
+  // can show a "we don't ship here yet" message (CASE A) instead of the
+  // "prices coming soon" message used when a served region simply has no
+  // price yet (CASE B). When the visitor IS served, the cookie is cleared.
+  const geoCountryCode = request.headers
+    .get("x-vercel-ip-country")
+    ?.toLowerCase()
+  const geoUnserved =
+    geoCountryCode && !regionMap.has(geoCountryCode) ? geoCountryCode : ""
+
+  const applyGeoCookie = (res: NextResponse) => {
+    if (geoUnserved) {
+      res.cookies.set("_medusa_geo_unserved", geoUnserved, {
+        maxAge: 60 * 60 * 24,
+        sameSite: "lax",
+      })
+    } else if (geoCountryCode) {
+      // We know the visitor's country and it IS served — drop any stale flag.
+      res.cookies.set("_medusa_geo_unserved", "", { maxAge: 0 })
+    }
+    return res
+  }
+
   const urlHasCountryCode =
     countryCode && request.nextUrl.pathname.split("/")[1].includes(countryCode)
 
@@ -134,13 +160,25 @@ export async function middleware(request: NextRequest) {
   // the same now.
   void isEditorMode
   if (urlHasCountryCode) {
-    const nextResponse = NextResponse.next()
+    // Forward the unserved flag onto the request cookies too, so the RSC that
+    // renders THIS request (via getGeoUnservedCountry) sees it immediately —
+    // a cookie set only on the response wouldn't be readable until the next
+    // request, flashing the wrong message on a direct deep-link.
+    const requestHeaders = new Headers(request.headers)
+    if (geoUnserved && !/(^|;\s*)_medusa_geo_unserved=/.test(requestHeaders.get("cookie") || "")) {
+      const existing = requestHeaders.get("cookie")
+      requestHeaders.set(
+        "cookie",
+        `${existing ? existing + "; " : ""}_medusa_geo_unserved=${geoUnserved}`
+      )
+    }
+    const nextResponse = NextResponse.next({ request: { headers: requestHeaders } })
     if (!cacheIdCookie) {
       nextResponse.cookies.set("_medusa_cache_id", cacheId, {
         maxAge: 60 * 60 * 24,
       })
     }
-    return nextResponse
+    return applyGeoCookie(nextResponse)
   }
 
   // check if the url is a static asset
@@ -165,7 +203,7 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  return response
+  return applyGeoCookie(response)
 }
 
 export const config = {
