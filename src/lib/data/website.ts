@@ -232,6 +232,49 @@ export async function getWebsite(
   })
 }
 
+export type UnsubscribeInfo = { found: boolean; email: string | null }
+
+export type UnsubscribeResult = {
+  message: string
+  email: string | null
+  unsubscribed: number
+  already_off?: boolean
+}
+
+// GET /web/website/:domain/unsubscribe — non-mutating; resolves the (masked)
+// target email so the confirm page can echo which address is being removed.
+export async function getUnsubscribeInfo(
+  params: { id?: string; email?: string },
+  domain?: string
+): Promise<UnsubscribeInfo> {
+  const resolvedDomain = domain || (await getStorefrontDomain())
+  const qs = new URLSearchParams()
+  if (params.id) qs.set("id", params.id)
+  if (params.email) qs.set("email", params.email)
+  return sdk.client.fetch<UnsubscribeInfo>(
+    `/web/website/${resolvedDomain}/unsubscribe?${qs.toString()}`,
+    { cache: "no-store" }
+  )
+}
+
+// POST /web/website/:domain/unsubscribe — performs the opt-out. Idempotent.
+// NOTE: sdk.client.fetch auto-stringifies the body — pass the object, never
+// JSON.stringify (double-encoding trips the backend's strict parser).
+export async function unsubscribeSubscriber(
+  params: { id?: string; email?: string },
+  domain?: string
+): Promise<UnsubscribeResult> {
+  const resolvedDomain = domain || (await getStorefrontDomain())
+  return sdk.client.fetch<UnsubscribeResult>(
+    `/web/website/${resolvedDomain}/unsubscribe`,
+    {
+      method: "POST",
+      body: { id: params.id, email: params.email },
+      cache: "no-store",
+    }
+  )
+}
+
 // GET /web/website/:domain/:page
 export async function getWebsitePage(
   domain: string | undefined,
