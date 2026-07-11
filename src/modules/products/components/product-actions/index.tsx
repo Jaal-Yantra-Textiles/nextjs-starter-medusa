@@ -3,7 +3,7 @@
 import { addToCart } from "@lib/data/cart"
 import { useIntersection } from "@lib/hooks/use-in-view"
 import { HttpTypes } from "@medusajs/types"
-import { Button } from "@medusajs/ui"
+import { Button, Text } from "@medusajs/ui"
 import Divider from "@modules/common/components/divider"
 import OptionSelect from "@modules/products/components/product-actions/option-select"
 import { isEqual } from "lodash"
@@ -12,6 +12,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import ProductPrice from "../product-price"
 import PriceComingSoon from "../price-coming-soon"
 import RegionNotServedFallback from "../region-not-served-fallback"
+import MadeToOrderNotice from "../artisan-detail/made-to-order-notice"
+import { getArtisanDetail } from "../artisan-detail"
 import MobileActions from "./mobile-actions"
 import { useRouter } from "next/navigation"
 
@@ -129,6 +131,19 @@ export default function ProductActions({
 
   const inView = useIntersection(actionsRef, "0px")
 
+  // A multi-variant product where the shopper hasn't picked a valid variant
+  // yet. Until they do we can't resolve a variant-specific price or stock, so
+  // we prompt them to choose rather than flashing a misleading "Out of stock".
+  const needsVariantSelection =
+    (product.variants?.length ?? 0) > 1 && !isValidVariant
+
+  // #859 S3 (#862): artisan made-to-order / min-order-qty detail.
+  const artisanDetail = useMemo(() => getArtisanDetail(product), [product])
+  const minOrderQuantity = useMemo(() => {
+    const min = artisanDetail?.min_order_quantity
+    return min && min > 1 ? min : 1
+  }, [artisanDetail])
+
   // True when at least one variant has a calculated_price for the visitor's
   // region. When false we can't show a price or add-to-cart, so we swap the
   // commerce block for a fallback: "we don't ship here yet" if the visitor's
@@ -148,7 +163,7 @@ export default function ProductActions({
 
     await addToCart({
       variantId: selectedVariant.id,
-      quantity: 1,
+      quantity: minOrderQuantity,
       countryCode,
     })
 
@@ -199,6 +214,8 @@ export default function ProductActions({
 
         <ProductPrice product={product} variant={selectedVariant} />
 
+        <MadeToOrderNotice detail={artisanDetail} />
+
         <Button
           onClick={handleAddToCart}
           disabled={
@@ -213,12 +230,21 @@ export default function ProductActions({
           isLoading={isAdding}
           data-testid="add-product-button"
         >
-          {!selectedVariant && !options
-            ? "Select variant"
+          {needsVariantSelection
+            ? "Select a variant"
             : !inStock || !isValidVariant
             ? "Out of stock"
             : ctaText || "Add to cart"}
         </Button>
+        {needsVariantSelection && (
+          <Text
+            className="text-ui-fg-subtle text-center"
+            size="small"
+            data-testid="select-variant-hint"
+          >
+            Select an option above to see price and availability.
+          </Text>
+        )}
         <MobileActions
           product={product}
           variant={selectedVariant}

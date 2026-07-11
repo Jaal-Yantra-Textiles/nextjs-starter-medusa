@@ -6,6 +6,7 @@ import ProductOnboardingCta from "@modules/products/components/product-onboardin
 import ProductTabs from "@modules/products/components/product-tabs"
 import RelatedProducts from "@modules/products/components/related-products"
 import ProductInfo from "@modules/products/templates/product-info"
+import MakerStory from "@modules/products/components/artisan-detail/maker-story"
 import SkeletonRelatedProducts from "@modules/skeletons/templates/skeleton-related-products"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { notFound } from "next/navigation"
@@ -122,6 +123,7 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
           {showTabs && (
             <ProductTabs product={product} layout={descriptionLayout} />
           )}
+          <MakerStory product={product} />
         </div>
         <div
           className={clx(
