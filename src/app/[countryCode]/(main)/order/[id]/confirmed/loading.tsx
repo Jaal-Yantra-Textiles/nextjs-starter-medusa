@@ -1,3 +1,4 @@
+export const runtime = "edge"
 import SkeletonOrderConfirmed from "@modules/skeletons/templates/skeleton-order-confirmed"
 
 export default function Loading() {

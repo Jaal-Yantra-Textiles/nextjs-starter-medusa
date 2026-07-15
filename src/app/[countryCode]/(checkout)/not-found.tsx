@@ -1,3 +1,4 @@
+export const runtime = "edge"
 import InteractiveLink from "@modules/common/components/interactive-link"
 import { Metadata } from "next"
 
