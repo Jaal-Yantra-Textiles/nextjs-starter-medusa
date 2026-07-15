@@ -4,6 +4,8 @@ import { CustomAnalyticsInjector } from "@modules/website/components/custom-anal
 import { Metadata } from "next"
 import "styles/globals.css"
 
+export const runtime = "edge"
+
 // Default in-house tracker — same CDN-hosted bundle that apps/storefront
 // uses. Override per-deployment with NEXT_PUBLIC_ANALYTICS_SCRIPT_URL if
 // a partner needs to point at a different host.

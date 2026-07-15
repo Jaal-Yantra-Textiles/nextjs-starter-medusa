@@ -13,6 +13,8 @@ import Footer from "@modules/layout/templates/footer"
 import Nav from "@modules/layout/templates/nav"
 import FreeShippingPriceNudge from "@modules/shipping/components/free-shipping-price-nudge"
 
+export const runtime = "edge"
+
 export const metadata: Metadata = {
   metadataBase: new URL(getBaseURL()),
 }

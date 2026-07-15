@@ -18,7 +18,10 @@ import {
   getFirstProductImageFor,
 } from "@lib/util/seo"
 import { getBaseURL } from "@lib/util/env"
+
 import ThemeEditorBridge from "@modules/layout/components/theme-editor-bridge"
+
+export const runtime = "edge"
 
 export async function generateMetadata(props: {
   params: Promise<{ countryCode: string }>

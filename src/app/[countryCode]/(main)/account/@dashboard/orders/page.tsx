@@ -4,7 +4,10 @@ import OrderOverview from "@modules/account/components/order-overview"
 import { notFound } from "next/navigation"
 import { listOrders } from "@lib/data/orders"
 import Divider from "@modules/common/components/divider"
+
 import TransferRequestForm from "@modules/account/components/transfer-request-form"
+
+export const runtime = "edge"
 
 export const metadata: Metadata = {
   title: "Orders",

@@ -3,7 +3,10 @@ import { Metadata } from "next"
 import { getWebsitePage } from "@lib/data/website"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import TipTapViewer from "@modules/website/components/tiptap-viewer"
+
 import VisualEditorBridge from "@modules/website/components/visual-editor-bridge"
+
+export const runtime = "edge"
 
 export async function generateMetadata({
   params,

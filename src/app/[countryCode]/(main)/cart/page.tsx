@@ -3,7 +3,10 @@ import { retrieveCustomer } from "@lib/data/customer"
 import { getWebsite } from "@lib/data/website"
 import CartTemplate from "@modules/cart/templates"
 import { Metadata } from "next"
+
 import { notFound } from "next/navigation"
+
+export const runtime = "edge"
 
 export const metadata: Metadata = {
   title: "Cart",

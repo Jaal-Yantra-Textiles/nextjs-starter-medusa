@@ -1,7 +1,10 @@
 import { Metadata } from "next"
 
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
+
 import StoreTemplate from "@modules/store/templates"
+
+export const runtime = "edge"
 
 export const metadata: Metadata = {
   title: "Store",

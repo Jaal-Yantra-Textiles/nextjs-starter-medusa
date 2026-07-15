@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sdk } from "@lib/config"
+
 import { cookies as nextCookies } from "next/headers"
+
+export const runtime = "edge"
 
 function failedRedirect(
   countryCode: string,

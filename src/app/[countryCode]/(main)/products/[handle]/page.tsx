@@ -5,7 +5,10 @@ import { getRegion } from "@lib/data/regions"
 import { getWebsite } from "@lib/data/website"
 import { buildLocalizedAlternates, cleanMetaDescription } from "@lib/util/seo"
 import ProductTemplate from "@modules/products/templates"
+
 import { HttpTypes } from "@medusajs/types"
+
+export const runtime = "edge"
 
 // Force dynamic rendering to avoid DYNAMIC_SERVER_USAGE errors
 // caused by cookies() calls in getRegion/getCacheOptions during ISR
