@@ -65,6 +65,18 @@ const nextConfig = {
         : []),
     ],
   },
+  serverExternalPackages: [],
+  webpack: (config, { isServer, nextRuntime }) => {
+    if (isServer && nextRuntime === "edge") {
+      config.module.rules.push({
+        test: /@radix-ui|@tanstack|@medusajs\/ui/,
+        parser: {
+          exportsPresence: false,
+        },
+      })
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig
