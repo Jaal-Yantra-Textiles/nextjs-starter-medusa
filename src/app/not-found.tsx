@@ -1,4 +1,3 @@
-export const runtime = "edge"
 import { ArrowUpRightMini } from "@medusajs/icons"
 import { Text } from "@medusajs/ui"
 import { Metadata } from "next"

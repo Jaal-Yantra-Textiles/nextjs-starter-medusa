@@ -6,7 +6,6 @@ import TipTapViewer from "@modules/website/components/tiptap-viewer"
 
 import VisualEditorBridge from "@modules/website/components/visual-editor-bridge"
 
-export const runtime = "edge"
 
 export async function generateMetadata({
   params,

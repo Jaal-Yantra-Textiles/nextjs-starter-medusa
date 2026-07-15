@@ -11,7 +11,6 @@ import CategoryTemplate from "@modules/categories/templates"
 
 import { SortOptions } from "@modules/store/components/refinement-list/sort-products"
 
-export const runtime = "edge"
 
 export const dynamic = "force-dynamic"
 

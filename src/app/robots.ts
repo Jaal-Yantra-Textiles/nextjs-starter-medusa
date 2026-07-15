@@ -1,4 +1,3 @@
-export const runtime = "edge"
 
 import { MetadataRoute } from "next"
 import { getBaseURL } from "@lib/util/env"

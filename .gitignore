@@ -23,6 +23,14 @@
 .DS_Store
 *.pem
 
+# opennext / cloudflare workers
+/.open-next/
+.dev.vars
+cloudflare-env.d.ts
+
+# wrangler local state
+.wrangler/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

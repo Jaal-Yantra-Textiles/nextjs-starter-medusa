@@ -1,4 +1,3 @@
-export const runtime = "edge"
 
 import { MetadataRoute } from "next"
 import { listCollections } from "@lib/data/collections"

@@ -3,7 +3,6 @@ import { Heading, Text } from "@medusajs/ui"
 
 import TransferImage from "@modules/order/components/transfer-image"
 
-export const runtime = "edge"
 
 export default async function TransferPage({
   params,

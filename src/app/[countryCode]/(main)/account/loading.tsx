@@ -1,4 +1,3 @@
-export const runtime = "edge"
 import Spinner from "@modules/common/icons/spinner"
 
 export default function Loading() {

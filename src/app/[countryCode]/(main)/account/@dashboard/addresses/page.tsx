@@ -7,7 +7,6 @@ import { getRegion } from "@lib/data/regions"
 
 import { retrieveCustomer } from "@lib/data/customer"
 
-export const runtime = "edge"
 
 export const metadata: Metadata = {
   title: "Addresses",

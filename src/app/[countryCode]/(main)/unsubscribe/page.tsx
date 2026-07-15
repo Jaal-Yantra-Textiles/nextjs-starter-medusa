@@ -3,7 +3,6 @@ import { getUnsubscribeInfo } from "@lib/data/website"
 
 import UnsubscribeForm from "@modules/website/components/unsubscribe-form"
 
-export const runtime = "edge"
 
 export const metadata: Metadata = {
   title: "Unsubscribe",

@@ -3,7 +3,6 @@ import { sdk } from "@lib/config"
 
 import { cookies as nextCookies } from "next/headers"
 
-export const runtime = "edge"
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData()

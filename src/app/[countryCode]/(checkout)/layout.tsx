@@ -2,7 +2,6 @@ import { STORE_NAME } from "@lib/constants"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import ChevronDown from "@modules/common/icons/chevron-down"
 
-export const runtime = "edge"
 
 export default function CheckoutLayout({
   children,

@@ -2,7 +2,6 @@ import { revalidatePath, revalidateTag } from "next/cache"
 
 import { NextRequest, NextResponse } from "next/server"
 
-export const runtime = "edge"
 
 /**
  * POST /api/revalidate

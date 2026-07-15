@@ -6,7 +6,6 @@ import { retrieveCustomer } from "@lib/data/customer"
 
 import { listOrders } from "@lib/data/orders"
 
-export const runtime = "edge"
 
 export const metadata: Metadata = {
   title: "Account",
