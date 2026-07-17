@@ -7,6 +7,16 @@
     "nodejs_compat",
     "global_fetch_strictly_public"
   ],
+  // Runtime vars. `wrangler deploy` overwrites the worker's config with this
+  // file, so dashboard-set runtime vars don't survive a deploy — anything the
+  // SERVER reads at runtime must live here. NEXT_PUBLIC_* are inlined into the
+  // bundle at build time (set them as Workers Builds *build* variables), so
+  // only non-public server-read vars belong here. The backend URL is shared +
+  // public. (Basic tier later: add "NEXT_PUBLIC_MULTI_TENANT": "true" as a
+  // BUILD variable, not here.)
+  "vars": {
+    "MEDUSA_BACKEND_URL": "https://v3.jaalyantra.com"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
