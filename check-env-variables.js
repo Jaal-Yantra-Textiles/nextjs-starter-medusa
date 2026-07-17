@@ -10,6 +10,12 @@ const requiredEnvs = [
 ]
 
 function checkEnvVariables() {
+  // The shared multi-tenant Worker resolves the publishable key per request
+  // (Host → key), so it intentionally ships without a baked-in key.
+  if (process.env.NEXT_PUBLIC_MULTI_TENANT === "true") {
+    return
+  }
+
   const missingEnvs = requiredEnvs.filter(function (env) {
     return !process.env[env.key]
   })

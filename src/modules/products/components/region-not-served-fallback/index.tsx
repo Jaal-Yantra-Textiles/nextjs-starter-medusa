@@ -3,6 +3,7 @@
 import { Button, Input, Label, Text, Textarea, clx } from "@medusajs/ui"
 import { HttpTypes } from "@medusajs/types"
 import { useState } from "react"
+import { getClientPublishableKey } from "@lib/util/get-client-pubkey"
 
 type Props = {
   product?: HttpTypes.StoreProduct
@@ -34,8 +35,9 @@ export default function RegionNotServedFallback({
 
   const backendUrl =
     process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
-  const publishableKey =
-    process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
+  // Env key on single-tenant deploys; the Host-resolved `_medusa_pk` cookie on
+  // the shared multi-tenant Worker.
+  const publishableKey = getClientPublishableKey()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
