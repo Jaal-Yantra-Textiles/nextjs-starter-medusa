@@ -13,6 +13,10 @@ const S3_PATHNAME = process.env.MEDUSA_CLOUD_S3_PATHNAME
  */
 const nextConfig = {
   reactStrictMode: true,
+  // Pin the file-tracing root to THIS app. The storefront lives as a submodule
+  // inside the monorepo, so Next otherwise infers the parent workspace root
+  // (two lockfiles) and can mis-trace files for the OpenNext/Workers bundle.
+  outputFileTracingRoot: __dirname,
   logging: {
     fetches: {
       fullUrl: true,
