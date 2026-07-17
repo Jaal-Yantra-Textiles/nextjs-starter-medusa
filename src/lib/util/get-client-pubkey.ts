@@ -6,9 +6,15 @@
  * edge middleware set.
  */
 export function getClientPublishableKey(): string {
-  const envKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
-  if (envKey) {
-    return envKey
+  // In multi-tenant mode the env key (if any leaked into the build) belongs to
+  // no single tenant — always prefer the Host-resolved cookie. Mirror the
+  // server-side IS_MULTI_TENANT precedence in get-request-pubkey.ts.
+  const isMultiTenant = process.env.NEXT_PUBLIC_MULTI_TENANT === "true"
+  if (!isMultiTenant) {
+    const envKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY
+    if (envKey) {
+      return envKey
+    }
   }
   if (typeof document !== "undefined") {
     const match = document.cookie.match(/(?:^|;\s*)_medusa_pk=([^;]+)/)
