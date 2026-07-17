@@ -10,6 +10,44 @@ import {
 const BACKEND_URL = process.env.MEDUSA_BACKEND_URL
 const DEFAULT_REGION = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
 
+// The marketplace home a visitor is sent to when they land on the shared Worker
+// via a host that maps to NO storefront (e.g. the raw workers.dev URL, or a
+// domain that isn't wired up). Overridable per-deploy.
+const MARKETPLACE_URL =
+  process.env.NEXT_PUBLIC_MARKETPLACE_URL || "https://cicilabel.com"
+
+// Friendly "no storefront at this domain" page for the shared multi-tenant
+// Worker — instead of a bare 404, point the visitor at the marketplace. Served
+// with a 404 status (this host genuinely hosts no storefront) but a real HTML
+// body so browsers render it. Self-contained (no assets) since it must work
+// before any tenant/region resolution.
+const NO_TENANT_HTML = (host: string) => `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>No storefront here</title>
+<style>
+:root{color-scheme:light dark}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+background:#fafaf9;color:#1c1917;padding:24px}
+@media(prefers-color-scheme:dark){body{background:#0c0a09;color:#fafaf9}}
+.card{max-width:32rem;text-align:center}
+h1{font-size:1.5rem;line-height:1.2;margin:0 0 .75rem;font-weight:600}
+p{font-size:1rem;line-height:1.6;margin:0 0 1.5rem;opacity:.7}
+code{font-size:.85em;padding:.1em .4em;border-radius:.3em;background:rgba(120,113,108,.18)}
+a.cta{display:inline-block;padding:.75rem 1.5rem;border-radius:.6rem;background:#1c1917;
+color:#fafaf9;text-decoration:none;font-weight:600;font-size:.95rem}
+@media(prefers-color-scheme:dark){a.cta{background:#fafaf9;color:#0c0a09}}
+</style></head>
+<body><div class="card">
+<h1>Nothing to shop at this address</h1>
+<p>There's no storefront wired up for <code>${host}</code> yet. Discover our
+makers and shop handcrafted textiles on the marketplace.</p>
+<a class="cta" href="${MARKETPLACE_URL}">Shop on CiciLabel &rarr;</a>
+</div></body></html>`
+
 // Region maps are cached PER TENANT (keyed by publishable key). A shared
 // multi-tenant Worker serves many stores from one isolate, so a single global
 // region map would leak one tenant's regions to another. Single-tenant deploys
@@ -212,8 +250,11 @@ export async function middleware(request: NextRequest) {
   if (IS_MULTI_TENANT) {
     const tenant = await resolveTenant(host)
     if (!tenant) {
-      return new NextResponse("Storefront not found for this domain.", {
+      // Unknown host → not one of our storefronts. Show a friendly page that
+      // points the visitor at the marketplace instead of a bare 404.
+      return new NextResponse(NO_TENANT_HTML(host), {
         status: 404,
+        headers: { "content-type": "text/html; charset=utf-8" },
       })
     }
     pubkey = tenant.publishableKey
