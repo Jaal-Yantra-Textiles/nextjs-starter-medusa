@@ -100,20 +100,33 @@ async function getRegionMap(pubkey: string, cacheScope: string) {
   ) {
     // Fetch regions from Medusa. We can't use the JS client here because
     // middleware runs on the Edge and the client needs a Node environment.
-    const regionsUrl = IS_MULTI_TENANT
-      ? `${BACKEND_URL}/store/regions?_pk=${encodeURIComponent(pubkey)}`
-      : `${BACKEND_URL}/store/regions`
+    //
+    // Multi-tenant caching is the subtle part. A shared Worker serves many
+    // stores, and Next's fetch cache keys by URL (NOT by the
+    // x-publishable-api-key header), so a single cached `/store/regions`
+    // entry would leak one tenant's regions to another. We can't disambiguate
+    // by URL either — Medusa's Store API rejects unknown query params, so a
+    // cache-busting `?_pk=<key>` returns 400 (which used to throw below → 500
+    // on every page). So in multi-tenant mode we bypass Next's fetch cache
+    // entirely (`no-store`) and rely on the in-isolate `regionMapCache` above
+    // (keyed by pubkey, 1h TTL) for performance — this fetch only runs on a
+    // cold/stale key. Single-tenant keeps the shared, tagged fetch cache
+    // (one tenant, no cross-tenant leak).
+    const regionsUrl = `${BACKEND_URL}/store/regions`
+    const fetchInit: RequestInit & {
+      next?: { revalidate: number; tags: string[] }
+    } = IS_MULTI_TENANT
+      ? {
+          headers: { "x-publishable-api-key": pubkey },
+          cache: "no-store",
+        }
+      : {
+          headers: { "x-publishable-api-key": pubkey },
+          next: { revalidate: 3600, tags: [`regions-${cacheScope}`] },
+          cache: "force-cache",
+        }
 
-    const { regions } = await fetch(regionsUrl, {
-      headers: {
-        "x-publishable-api-key": pubkey,
-      },
-      next: {
-        revalidate: 3600,
-        tags: [`regions-${cacheScope}`],
-      },
-      cache: "force-cache",
-    }).then(async (response) => {
+    const { regions } = await fetch(regionsUrl, fetchInit).then(async (response) => {
       const json = await response.json()
 
       if (!response.ok) {
