@@ -2,11 +2,11 @@
 import { MetadataRoute } from "next"
 import { getRequestBaseURL } from "@lib/util/base-url"
 
-// Same rationale as sitemap.ts: per-tenant Host must not be cached across
-// domains in multi-tenant mode. Single-tenant stays statically cacheable.
-export const dynamic =
-  process.env.NEXT_PUBLIC_MULTI_TENANT === "true" ? "force-dynamic" : "auto"
-
+// No `dynamic` config export — Next requires a static literal there and rejects
+// a `process.env` ternary at build. Instead, multi-tenant reads the request
+// Host via getRequestBaseURL() (→ `headers()`), which makes this route render
+// per-request so a tenant's robots isn't cached and served to another domain.
+// Single-tenant never reads headers → stays statically cacheable.
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const baseUrl = await getRequestBaseURL()
 
