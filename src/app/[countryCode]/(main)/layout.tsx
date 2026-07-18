@@ -3,7 +3,7 @@ import { headers } from "next/headers"
 
 import { listCartOptions, retrieveCart } from "@lib/data/cart"
 import { retrieveCustomer } from "@lib/data/customer"
-import { getBaseURL } from "@lib/util/env"
+import { getRequestBaseURL } from "@lib/util/base-url"
 import { getWebsite } from "@lib/data/website"
 import { StoreCartShippingOption } from "@medusajs/types"
 import CartMismatchBanner from "@modules/layout/components/cart-mismatch-banner"
@@ -14,8 +14,10 @@ import Nav from "@modules/layout/templates/nav"
 import FreeShippingPriceNudge from "@modules/shipping/components/free-shipping-price-nudge"
 
 
-export const metadata: Metadata = {
-  metadataBase: new URL(getBaseURL()),
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    metadataBase: new URL(await getRequestBaseURL()),
+  }
 }
 
 export default async function PageLayout(props: { children: React.ReactNode }) {

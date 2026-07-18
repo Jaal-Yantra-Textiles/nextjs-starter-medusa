@@ -1,5 +1,5 @@
 import { HttpTypes } from "@medusajs/types"
-import { getBaseURL } from "@lib/util/env"
+import { getRequestBaseURL } from "@lib/util/base-url"
 
 type Variant = HttpTypes.StoreProductVariant & {
   calculated_price?: {
@@ -29,14 +29,20 @@ const isVariantInStock = (v: Variant): boolean => {
  * variant's inventory flags, matching the in-stock logic used by the
  * product-actions "Add to cart" button.
  */
-export const buildProductJsonLd = (
+export const buildProductJsonLd = async (
   product: HttpTypes.StoreProduct,
-  opts: { countryCode?: string; fallbackCurrency?: string } = {}
-): Record<string, unknown> => {
-  const baseUrl = getBaseURL()
+  opts: {
+    countryCode?: string
+    fallbackCurrency?: string
+    /** Tenant store name (from getWebsite().theme.branding.store_name). */
+    storeName?: string
+  } = {}
+): Promise<Record<string, unknown>> => {
+  const baseUrl = await getRequestBaseURL()
   const countryCode = opts.countryCode
   const fallbackCurrency = opts.fallbackCurrency?.toUpperCase() || "USD"
-  const storeName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+  const storeName =
+    opts.storeName || process.env.NEXT_PUBLIC_STORE_NAME || "Store"
 
   const variants = ((product.variants ?? []) as Variant[]).filter(
     (v) => !!v.calculated_price
