@@ -4,6 +4,8 @@ import { listProducts } from "@lib/data/products"
 // Default country used when regions can't be loaded (build-time safety net).
 const FALLBACK_COUNTRY = process.env.NEXT_PUBLIC_DEFAULT_REGION || "us"
 
+const IS_MULTI_TENANT = process.env.NEXT_PUBLIC_MULTI_TENANT === "true"
+
 // Explicit overrides where the ISO-2 country doesn't map cleanly to BCP-47
 // via `en-${cc}`. All current regions are English-speaking, so we hard-code
 // the language to "en". If the storefront ever ships non-English locales,
@@ -53,23 +55,30 @@ export const countryToLocale = (cc: string): string => {
   return LOCALE_OVERRIDES[lower] ?? `en-${lower.toUpperCase()}`
 }
 
+// Module-level cache is safe ONLY single-tenant (one deployment == one store).
+// On the shared multi-tenant Worker this isolate serves many tenants, so a
+// bare singleton would leak the first tenant's country list into every other
+// tenant's hreflang alternates — skip it and re-resolve per request (listRegions
+// is itself request-cached by the SDK / Next fetch).
 let cachedCountryCodes: string[] | null = null
 
 export const getAllCountryCodes = async (): Promise<string[]> => {
-  if (cachedCountryCodes) return cachedCountryCodes
+  if (!IS_MULTI_TENANT && cachedCountryCodes) return cachedCountryCodes
 
+  let result: string[]
   try {
     const regions = await listRegions()
     const codes = (regions ?? [])
       .flatMap((r) => r.countries?.map((c) => c.iso_2) ?? [])
       .filter((c): c is string => Boolean(c))
 
-    cachedCountryCodes = codes.length ? codes : [FALLBACK_COUNTRY]
+    result = codes.length ? codes : [FALLBACK_COUNTRY]
   } catch {
-    cachedCountryCodes = [FALLBACK_COUNTRY]
+    result = [FALLBACK_COUNTRY]
   }
 
-  return cachedCountryCodes
+  if (!IS_MULTI_TENANT) cachedCountryCodes = result
+  return result
 }
 
 /**
@@ -95,11 +104,12 @@ export const buildLocalizedAlternates = async (
     languages[countryToLocale(cc)] = url
   }
 
-  // x-default points at the current country's URL — Google treats this as
-  // the fallback when no locale matches. Using the current region keeps
-  // canonical and x-default aligned for the page being rendered.
+  // x-default = the country-LESS path. The middleware 307-redirects a path
+  // without a country prefix to the visitor's detected region, so this is the
+  // "auto-redirecting" URL Google wants as the fallback. The canonical stays
+  // the concrete current-country page (a 200) so the rendered page self-points.
   const canonicalPath = `/${currentCountryCode}${cleanPath ? `/${cleanPath}` : ""}`
-  languages["x-default"] = canonicalPath
+  languages["x-default"] = cleanPath ? `/${cleanPath}` : "/"
 
   return {
     canonical: canonicalPath,

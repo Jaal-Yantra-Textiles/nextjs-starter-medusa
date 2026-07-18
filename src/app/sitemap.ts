@@ -23,6 +23,8 @@ type SitemapEntry = MetadataRoute.Sitemap[number]
 const PRODUCT_FETCH_TIMEOUT_MS = 45_000
 const PRODUCT_PAGE_LIMIT = 100
 
+const IS_MULTI_TENANT = process.env.NEXT_PUBLIC_MULTI_TENANT === "true"
+
 const DEFAULT_COUNTRY =
   process.env.NEXT_PUBLIC_DEFAULT_REGION?.toLowerCase() || "us"
 
@@ -64,7 +66,11 @@ const buildEntry = ({
   for (const cc of countryCodes) {
     languages[countryToLocale(cc)] = `${baseUrl}/${cc}${suffix}`
   }
-  languages["x-default"] = `${baseUrl}/${defaultCountry}${suffix}`
+  // x-default = the country-LESS URL. The middleware 307-redirects a path with
+  // no country prefix to the visitor's detected region, so this is the
+  // "auto-redirecting" URL Google wants for x-default. `url` stays a concrete
+  // regional page (a 200) as the representative canonical.
+  languages["x-default"] = `${baseUrl}${suffix}`
 
   return {
     url: `${baseUrl}/${defaultCountry}${suffix}`,
@@ -87,9 +93,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     countryCodes.push(DEFAULT_COUNTRY)
   }
 
-  const defaultCountry = countryCodes.includes(DEFAULT_COUNTRY)
-    ? DEFAULT_COUNTRY
-    : countryCodes[0]
+  // The region for each entry's representative `url` (a concrete 200 page;
+  // x-default is the country-less redirecting URL). Single-tenant: honour the
+  // partner's build-time NEXT_PUBLIC_DEFAULT_REGION. Multi-tenant: that env is
+  // baked once for the shared deployment (== "us" for everyone), so it must NOT
+  // decide the default — use the tenant's OWN first region instead. Every
+  // country is still emitted as an hreflang alternate, so Google resolves the
+  // right regional URL per user regardless.
+  const defaultCountry = IS_MULTI_TENANT
+    ? countryCodes[0]
+    : countryCodes.includes(DEFAULT_COUNTRY)
+      ? DEFAULT_COUNTRY
+      : countryCodes[0]
 
   const entries: MetadataRoute.Sitemap = []
 
