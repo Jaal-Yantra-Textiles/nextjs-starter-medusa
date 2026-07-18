@@ -8,12 +8,15 @@ import { countryToLocale } from "@lib/util/seo"
 
 type SitemapEntry = MetadataRoute.Sitemap[number]
 
-// Multi-tenant: ONE deployment serves many domains, and this route reads the
-// request Host (via getRequestBaseURL) + a per-tenant catalog. Force dynamic so
-// Next never caches one tenant's sitemap and serves it to another (cache
-// poisoning). Single-tenant: one domain, no Host coupling → keep it cacheable.
-export const dynamic =
-  process.env.NEXT_PUBLIC_MULTI_TENANT === "true" ? "force-dynamic" : "auto"
+// Cache behaviour is driven by request-header reads, NOT a `dynamic` config
+// export (Next only accepts a static literal there — a `process.env` ternary
+// fails the build with "Unsupported node type ConditionalExpression").
+//
+// Multi-tenant: getRequestBaseURL() (and the SDK's per-request publishable-key
+// resolution) read `headers()`, which opts this route into per-request dynamic
+// rendering — so Next never caches one tenant's sitemap and serves it to
+// another (cache poisoning). Single-tenant: `headers()` is never read, so the
+// route stays statically generated + cacheable.
 
 // Hard cap so a slow/hung backend can't stall the entire build.
 // Next 15 builds fail the sitemap route after ~60s; we bail earlier.
