@@ -17,7 +17,7 @@ import {
   buildLocalizedAlternates,
   getFirstProductImageFor,
 } from "@lib/util/seo"
-import { getBaseURL } from "@lib/util/env"
+import { getRequestBaseURL } from "@lib/util/base-url"
 
 import ThemeEditorBridge from "@modules/layout/components/theme-editor-bridge"
 
@@ -37,7 +37,7 @@ export async function generateMetadata(props: {
   // so social shares render a rich card rather than a plain text snippet.
   // Falls back to the static logo.
   const firstProductImage = await getFirstProductImageFor({ countryCode })
-  const baseUrl = getBaseURL()
+  const baseUrl = await getRequestBaseURL()
   const ogImage = firstProductImage ?? `${baseUrl}/logo.png`
 
   return {

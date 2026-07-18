@@ -3,10 +3,17 @@ import { MetadataRoute } from "next"
 import { listCollections } from "@lib/data/collections"
 import { listCategories } from "@lib/data/categories"
 import { listRegions } from "@lib/data/regions"
-import { getBaseURL } from "@lib/util/env"
+import { getRequestBaseURL } from "@lib/util/base-url"
 import { countryToLocale } from "@lib/util/seo"
 
 type SitemapEntry = MetadataRoute.Sitemap[number]
+
+// Multi-tenant: ONE deployment serves many domains, and this route reads the
+// request Host (via getRequestBaseURL) + a per-tenant catalog. Force dynamic so
+// Next never caches one tenant's sitemap and serves it to another (cache
+// poisoning). Single-tenant: one domain, no Host coupling → keep it cacheable.
+export const dynamic =
+  process.env.NEXT_PUBLIC_MULTI_TENANT === "true" ? "force-dynamic" : "auto"
 
 // Hard cap so a slow/hung backend can't stall the entire build.
 // Next 15 builds fail the sitemap route after ~60s; we bail earlier.
@@ -66,7 +73,7 @@ const buildEntry = ({
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = getBaseURL()
+  const baseUrl = await getRequestBaseURL()
 
   const regions = await listRegions().catch(() => [])
   const countryCodes = (regions ?? [])

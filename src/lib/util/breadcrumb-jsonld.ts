@@ -1,4 +1,4 @@
-import { getBaseURL } from "./env"
+import { getRequestBaseURL } from "./base-url"
 
 export type BreadcrumbItem = {
   name: string
@@ -12,10 +12,10 @@ export type BreadcrumbItem = {
  * URLs on BreadcrumbList items even when the page itself uses relative
  * canonicals.
  */
-export const buildBreadcrumbJsonLd = (
+export const buildBreadcrumbJsonLd = async (
   items: BreadcrumbItem[]
-): Record<string, unknown> => {
-  const baseUrl = getBaseURL()
+): Promise<Record<string, unknown>> => {
+  const baseUrl = await getRequestBaseURL()
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",

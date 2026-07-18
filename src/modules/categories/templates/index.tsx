@@ -10,7 +10,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 import { HttpTypes } from "@medusajs/types"
 import { buildBreadcrumbJsonLd } from "@lib/util/breadcrumb-jsonld"
 
-export default function CategoryTemplate({
+export default async function CategoryTemplate({
   category,
   sortBy,
   page,
@@ -39,7 +39,7 @@ export default function CategoryTemplate({
 
   // Breadcrumb chain: Home → parent ancestors (oldest first) → current.
   // `parents` is ordered child→ancestor, so reverse for the breadcrumb.
-  const breadcrumbLd = buildBreadcrumbJsonLd([
+  const breadcrumbLd = await buildBreadcrumbJsonLd([
     { name: "Home", path: `/${countryCode}` },
     ...parents
       .slice()

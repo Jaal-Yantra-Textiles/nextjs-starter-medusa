@@ -1,4 +1,4 @@
-import { getBaseURL } from "@lib/util/env"
+import { getRequestBaseURL } from "@lib/util/base-url"
 import { getWebsite, type WebsiteAnalytics, type WebsiteTheme } from "@lib/data/website"
 import { CustomAnalyticsInjector } from "@modules/website/components/custom-analytics-injector"
 import { Metadata } from "next"
@@ -29,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const faviconUrl = theme?.branding?.favicon_url
 
   return {
-    metadataBase: new URL(getBaseURL()),
+    metadataBase: new URL(await getRequestBaseURL()),
     title: {
       default: storeName,
       template: `%s | ${storeName}`,
@@ -51,8 +51,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function RootLayout(props: { children: React.ReactNode }) {
-  const baseUrl = getBaseURL()
-  const storeName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+  const baseUrl = await getRequestBaseURL()
+  // Tenant store name (Host-resolved via getWebsite) with an env fallback —
+  // same source the <title> uses, so JSON-LD brand/name isn't the same for
+  // every tenant on the shared deployment.
+  let storeName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
 
   // Fetch the website's analytics config so we know which script(s) to
   // inject. Failure is non-fatal — if the backend is down at build time
@@ -63,6 +66,7 @@ export default async function RootLayout(props: { children: React.ReactNode }) {
     const website = await getWebsite()
     websiteId = website.id
     analytics = website.analytics ?? null
+    storeName = website.theme?.branding?.store_name || storeName
   } catch {
     // backend unreachable — proceed without analytics
   }

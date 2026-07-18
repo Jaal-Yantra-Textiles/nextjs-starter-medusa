@@ -1,4 +1,4 @@
-import React, { Suspense } from "react"
+import { Suspense } from "react"
 
 import ImageGallery from "@modules/products/components/image-gallery"
 import ProductActions from "@modules/products/components/product-actions"
@@ -26,13 +26,13 @@ type ProductTemplateProps = {
   theme?: WebsiteTheme | null
 }
 
-const ProductTemplate: React.FC<ProductTemplateProps> = ({
+const ProductTemplate = async ({
   product,
   region,
   countryCode,
   images,
   theme,
-}) => {
+}: ProductTemplateProps) => {
   if (!product || !product.id) {
     return notFound()
   }
@@ -63,12 +63,13 @@ const ProductTemplate: React.FC<ProductTemplateProps> = ({
     },
   ]
 
-  const jsonLd = buildProductJsonLd(product, {
+  const jsonLd = await buildProductJsonLd(product, {
     countryCode,
     fallbackCurrency: region.currency_code,
+    storeName: theme?.branding?.store_name,
   })
 
-  const breadcrumbLd = buildBreadcrumbJsonLd(breadcrumbTrail)
+  const breadcrumbLd = await buildBreadcrumbJsonLd(breadcrumbTrail)
 
   return (
     <>
