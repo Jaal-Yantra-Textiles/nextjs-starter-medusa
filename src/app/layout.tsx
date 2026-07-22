@@ -18,9 +18,14 @@ const DEFAULT_DESCRIPTION =
 export async function generateMetadata(): Promise<Metadata> {
   const envStoreName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
   let theme: WebsiteTheme | null = null
+  // Google Search Console token — resolved per-tenant from the Host-scoped
+  // getWebsite() call (multi-tenant safe: each domain gets its own token,
+  // same resolution path as the store name / analytics config). #349
+  let googleSiteVerification: string | null = null
   try {
     const website = await getWebsite()
     theme = website.theme ?? null
+    googleSiteVerification = website.seo?.google_site_verification ?? null
   } catch {
     // backend unreachable — fall back to env-derived defaults
   }
@@ -36,6 +41,12 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description,
     icons: faviconUrl ? { icon: faviconUrl } : undefined,
+    // Renders <meta name="google-site-verification" content="…"> in <head>.
+    // Only emitted when the tenant has set a token, so storefronts without
+    // one stay clean. Next.js dedupes this across the metadata tree.
+    ...(googleSiteVerification
+      ? { verification: { google: googleSiteVerification } }
+      : {}),
     openGraph: {
       type: "website",
       siteName: storeName,
