@@ -171,6 +171,13 @@ export type WebsiteAnalytics = {
   custom_body_end: string | null
 }
 
+// SEO verification tokens the backend serves per-Website (#349). Injected into
+// <head> regardless of analytics provider (analytics.custom_head only renders
+// for the "custom" provider, so it can't double as the SEO hook).
+export type WebsiteSeo = {
+  google_site_verification: string | null
+}
+
 export type PublicWebsite = {
   // Backend-issued website id, stamped on outbound analytics events
   // (the in-house tracker uses this as `data-website-id`).
@@ -180,6 +187,7 @@ export type PublicWebsite = {
   theme?: WebsiteTheme | null
   favicon_url?: string | null
   analytics?: WebsiteAnalytics | null
+  seo?: WebsiteSeo | null
   pages: Array<PublicWebsitePage>
 }
 
