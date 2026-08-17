@@ -22,6 +22,13 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
           "/*/account",
           "/*/account/*",
           "/*/order/*",
+          // #859 — private artisan product review links. Unpublished and
+          // noindex'd, but this file is what advertises where they are, so
+          // omitting the rule publishes the location of every unlisted preview.
+          // The main storefront has had this since #859; this copy drifted and
+          // every partner domain runs THIS one (shared `storefront-shared`
+          // deployment), so the gap applied to all of them. See #1335.
+          "/*/products/preview/*",
         ],
       },
     ],
