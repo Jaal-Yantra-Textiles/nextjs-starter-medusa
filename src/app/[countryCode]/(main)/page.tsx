@@ -28,20 +28,43 @@ export async function generateMetadata(props: {
   const { countryCode } = await props.params
   const alternates = await buildLocalizedAlternates(countryCode, "")
 
-  const storeName = process.env.NEXT_PUBLIC_STORE_NAME || "Store"
-  const title = storeName
+  /**
+   * Read the tenant's own copy, exactly as the root layout does.
+   *
+   * This used to be `NEXT_PUBLIC_STORE_NAME || "Store"` plus a hardcoded
+   * description, which ignored the theme the partner had already filled in.
+   * On a live storefront that rendered `<title>Store | Unique Pashmina</title>`
+   * and shared the starter's boilerplate blurb to every social card — while
+   * the theme carried a real store name, tagline and hero description. The env
+   * var stays as the fallback for a storefront whose backend is unreachable.
+   */
+  const website = await getWebsite().catch(() => null)
+  const theme = website?.theme
+
+  const storeName =
+    theme?.branding?.store_name || process.env.NEXT_PUBLIC_STORE_NAME || "Store"
+  // The homepage title is the brand itself, so opt out of the root layout's
+  // `%s | <store>` template rather than rendering "Store | Store".
+  const title = theme?.hero?.title
+    ? `${storeName} — ${theme.hero.title}`
+    : storeName
   const description =
+    theme?.hero?.description ||
+    theme?.branding?.tagline ||
     "Shop handmade, locally sourced, and ethically produced fashion."
 
-  // Use the first catalogue product's thumbnail as the homepage OG image
-  // so social shares render a rich card rather than a plain text snippet.
-  // Falls back to the static logo.
+  // OG image preference: the hero the partner chose, then the first catalogue
+  // product's thumbnail, then the static logo. The hero is what a visitor sees
+  // first, so it is the honest preview of the page being shared.
   const firstProductImage = await getFirstProductImageFor({ countryCode })
   const baseUrl = await getRequestBaseURL()
-  const ogImage = firstProductImage ?? `${baseUrl}/logo.png`
+  const ogImage =
+    theme?.hero?.background_image_url ||
+    firstProductImage ||
+    `${baseUrl}/logo.png`
 
   return {
-    title,
+    title: { absolute: title },
     description,
     alternates,
     openGraph: {
