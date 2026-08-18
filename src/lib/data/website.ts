@@ -62,6 +62,8 @@ export type WebsiteTheme = {
     secondary_cta_text?: string
     secondary_cta_link?: string
     features?: Array<{ icon?: string; title: string; description?: string }>
+    /** Any CSS length — "60vh", "480px". Defaults to 75vh when unset. */
+    min_height?: string
   }
   navigation?: {
     links?: Array<{ label: string; href: string }>
@@ -220,6 +222,27 @@ export async function getStorefrontDomain(): Promise<string> {
   return host.replace(/:\d+$/, "")
 }
 
+/**
+ * How long a cached website/theme response may stay stale, in seconds.
+ *
+ * The backend POSTs `/api/revalidate` after every partner edit, and that is
+ * still the fast path — edits appear within a second or two. But that hop
+ * depends on a shared secret being set correctly on BOTH sides, per project,
+ * by hand: the backend sends `STOREFRONT_REVALIDATE_SECRET`, the storefront
+ * checks `REVALIDATE_SECRET`. When those disagree the route answers 401/503,
+ * the backend only warns to its own console, and the partner sees a green save
+ * that changes nothing on their live site — for as long as the deployment
+ * lives, because a tag-only `force-cache` entry has no expiry.
+ *
+ * A TTL makes that failure mode temporary instead of permanent: worst case the
+ * partner waits this long, rather than until the next deploy. Tune per
+ * deployment with WEBSITE_CACHE_TTL_SECONDS; set 0 to disable caching.
+ */
+const WEBSITE_CACHE_TTL_SECONDS = Number.parseInt(
+  process.env.WEBSITE_CACHE_TTL_SECONDS ?? "300",
+  10
+)
+
 // GET /web/website/:domain
 export async function getWebsite(
   domain?: string,
@@ -233,10 +256,21 @@ export async function getWebsite(
     })
   }
 
-  const next = { ...(await getCacheOptions("website")) }
+  // Tags stay — the webhook's targeted `revalidateTag("website")` is still the
+  // quickest way to pick up an edit. `revalidate` is the floor under it, not a
+  // replacement for it.
+  const next: Record<string, unknown> = {
+    ...(await getCacheOptions("website")),
+  }
+  if (Number.isFinite(WEBSITE_CACHE_TTL_SECONDS) && WEBSITE_CACHE_TTL_SECONDS > 0) {
+    next.revalidate = WEBSITE_CACHE_TTL_SECONDS
+  }
+
   return sdk.client.fetch<PublicWebsite>(`/web/website/${resolvedDomain}`, {
     next,
-    cache: "force-cache",
+    // `no-store` when the TTL is disabled: force-cache with no expiry and no
+    // working webhook is the exact trap this guards against.
+    cache: WEBSITE_CACHE_TTL_SECONDS > 0 ? "force-cache" : "no-store",
   })
 }
 

@@ -19,6 +19,14 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
   const secondaryCtaText = hero?.secondary_cta_text
   const secondaryCtaLink = hero?.secondary_cta_link || "/store"
   const features = hero?.features
+  /**
+   * Hero height. Both layouts hardcoded 75vh, which is right for a full-bleed
+   * photo and far too tall for a hero that is three lines of text — the
+   * setting existed in the API schema but nothing rendered it, so choosing a
+   * height was impossible however the partner tried. Any CSS length works
+   * ("60vh", "480px", "40rem"); unset keeps the previous 75vh.
+   */
+  const minHeight = hero?.min_height || "75vh"
 
   // Determine animation: hero-specific > global hero_entrance > none
   const animationsEnabled = animations?.enabled !== false
@@ -43,7 +51,10 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
   if (layout === "split") {
     return (
       <div className="w-full border-b border-ui-border-base" {...sectionAttrs}>
-        <div className="content-container grid grid-cols-1 small:grid-cols-2 min-h-[75vh]">
+        <div
+          className="content-container grid grid-cols-1 small:grid-cols-2"
+          style={{ minHeight }}
+        >
           <HeroAnimationWrapper animation={heroAnimation} className="flex flex-col justify-center py-16 small:py-24 gap-6">
             <HeroContent
               badgeText={badgeText}
@@ -86,7 +97,10 @@ const Hero = ({ theme, isThemeEditor }: { theme?: WebsiteTheme | null; isThemeEd
 
   return (
     <div className="w-full border-b border-ui-border-base" {...sectionAttrs}>
-      <div className="h-[75vh] w-full relative bg-ui-bg-subtle overflow-hidden">
+      <div
+        className="w-full relative bg-ui-bg-subtle overflow-hidden"
+        style={{ height: minHeight }}
+      >
         {/* Background image with optional animation */}
         {bgImage && (
           <img
