@@ -16,6 +16,7 @@ import { WebsiteTheme } from "@lib/data/website"
 import { buildBreadcrumbJsonLd } from "@lib/util/breadcrumb-jsonld"
 
 import ProductActionsWrapper from "./product-actions-wrapper"
+import ProductionSpec from "@modules/products/components/production-spec"
 import { buildProductJsonLd } from "./product-jsonld"
 
 type ProductTemplateProps = {
@@ -148,6 +149,10 @@ const ProductTemplate = async ({
             }
           >
             <ProductActionsWrapper id={product.id} region={region} ctaText={pt?.cta_text} />
+            {/* #1349 — what the piece is made to, and (when the partner takes
+                the work) the form to have one woven in a chosen colour.
+                Renders nothing when the product has no spec. */}
+            <ProductionSpec product={product} />
           </Suspense>
         </div>
       </div>
