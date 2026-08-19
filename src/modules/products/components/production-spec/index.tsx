@@ -3,7 +3,6 @@ import { Text } from "@medusajs/ui"
 
 import { getProductSpec } from "@lib/data/product-spec"
 
-import MadeToOrderForm from "./made-to-order-form"
 import SpecIcon from "./spec-icon"
 
 /**
@@ -79,7 +78,12 @@ const ProductionSpec = async ({ product }: Props) => {
 
   // A spec row can exist with nothing written on it. Rendering a heading over
   // an empty table would advertise detail the partner never provided.
-  if (!rows.length && !spec.accepting_custom_orders) {
+  //
+  // #1365 — `accepting_custom_orders` no longer keeps this block alive on its
+  // own. The ordering controls moved up into the buying column (between the
+  // variant selector and the price); what is left here is only the "Made to"
+  // description, so with no rows there is genuinely nothing to show.
+  if (!rows.length) {
     return null
   }
 
@@ -110,10 +114,6 @@ const ProductionSpec = async ({ product }: Props) => {
             </Text>
           )}
         </div>
-      )}
-
-      {spec.accepting_custom_orders && (
-        <MadeToOrderForm spec={spec} variants={product.variants ?? []} />
       )}
     </div>
   )
