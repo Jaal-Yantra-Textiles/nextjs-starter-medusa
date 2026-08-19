@@ -71,7 +71,18 @@ export type StoreSpecTechnique = {
   label: string
   family: string
   description: string
-  params: { key: string; label: string; unit: string }[]
+  params: {
+    key: string
+    label: string
+    unit: string
+    /**
+     * #1364 — which glyph to draw beside this row. Comes from the backend's
+     * weaving-technique registry, so a param added there arrives with its icon
+     * rather than needing a matching edit here. An unknown name renders the
+     * neutral mark (see spec-icon.tsx).
+     */
+    icon?: string
+  }[]
 }
 
 export type StoreProductSpecResponse = {

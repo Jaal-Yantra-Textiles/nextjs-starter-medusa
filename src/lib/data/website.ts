@@ -148,6 +148,31 @@ export type WebsiteTheme = {
     image_layout?: "gallery" | "single" | "grid"
     gallery_position?: "left" | "right"
     description_layout?: "tabs" | "accordion" | "stacked"
+    /**
+     * #1364 — the full-width band BELOW the gallery. Distinct from
+     * `description_layout`, which only ever chose a container for two hardcoded
+     * panels inside the narrow sticky column. The theme decides the SHAPE
+     * (which blocks, in what order, arranged how); each product supplies the
+     * substance, and a block its product cannot fill is not rendered.
+     */
+    detail_band?: {
+      enabled?: boolean
+      heading?: string
+      layout?: "grid-2" | "grid-3" | "rows" | "tabs" | "accordion"
+      blocks?: Array<{
+        source:
+          | "spec"
+          | "spec_fields"
+          | "attributes"
+          | "maker"
+          | "care"
+          | "shipping"
+        label?: string
+        /** Only read for the theme-authored sources (care, shipping). */
+        body?: string
+        enabled?: boolean
+      }>
+    }
     cta_text?: string
     sample_product_name?: string
     sample_product_price?: string

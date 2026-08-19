@@ -17,6 +17,7 @@ import { buildBreadcrumbJsonLd } from "@lib/util/breadcrumb-jsonld"
 
 import ProductActionsWrapper from "./product-actions-wrapper"
 import ProductionSpec from "@modules/products/components/production-spec"
+import ProductDetailBand from "@modules/products/components/detail-band"
 import { buildProductJsonLd } from "./product-jsonld"
 
 type ProductTemplateProps = {
@@ -156,6 +157,12 @@ const ProductTemplate = async ({
           </Suspense>
         </div>
       </div>
+      {/* #1364 — the band that fills the space between the three-column row
+          and Related Products. Renders nothing unless the theme turned it on
+          AND this product can fill at least one of its blocks. */}
+      <Suspense fallback={null}>
+        <ProductDetailBand product={product} theme={theme} />
+      </Suspense>
       {showRelated && (
         <div
           className="content-container my-16 small:my-32"
