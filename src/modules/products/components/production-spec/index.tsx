@@ -4,6 +4,7 @@ import { Text } from "@medusajs/ui"
 import { getProductSpec } from "@lib/data/product-spec"
 
 import MadeToOrderForm from "./made-to-order-form"
+import SpecIcon from "./spec-icon"
 
 /**
  * #1349 — the production spec on the product page.
@@ -35,6 +36,10 @@ const ProductionSpec = async ({ product }: Props) => {
       key,
       label: def?.label ?? key,
       value: def?.unit ? `${value} ${def.unit}` : `${value}`,
+      // A param the registry does not describe still renders — with the
+      // neutral mark, and its raw key as the label. An unrecognised spec is a
+      // plain row, never a gap.
+      icon: def?.icon,
     }
   })
 
@@ -45,6 +50,7 @@ const ProductionSpec = async ({ product }: Props) => {
             key: "weave",
             label: "Weave",
             value: spec.weave_label || technique?.label || "",
+            icon: "weave",
           },
         ]
       : []),
@@ -55,6 +61,7 @@ const ProductionSpec = async ({ product }: Props) => {
             key: "finishes",
             label: "Finishing & care",
             value: spec.finishes.join(", "),
+            icon: "finish",
           },
         ]
       : []),
@@ -64,6 +71,9 @@ const ProductionSpec = async ({ product }: Props) => {
         key: field.key,
         label: (field.label ?? field.key).trim(),
         value: (field.value ?? "").trim(),
+        // The partner named this one themselves, so there is nothing to map it
+        // to — the neutral mark keeps the column aligned with the rows above.
+        icon: "note",
       })),
   ]
 
@@ -84,7 +94,10 @@ const ProductionSpec = async ({ product }: Props) => {
                 key={row.key}
                 className="flex items-baseline justify-between gap-x-4 border-b border-ui-border-base py-2"
               >
-                <dt className="text-ui-fg-subtle text-sm">{row.label}</dt>
+                <dt className="text-ui-fg-subtle text-sm flex items-center gap-x-2">
+                  <SpecIcon name={row.icon} className="shrink-0 opacity-60" />
+                  {row.label}
+                </dt>
                 <dd className="text-ui-fg-base text-sm text-right">
                   {row.value}
                 </dd>
