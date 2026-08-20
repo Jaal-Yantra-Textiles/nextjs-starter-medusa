@@ -417,16 +417,32 @@ export default function ThemeEditorBridge() {
       // Live updates for the obvious text scalars; everything else is a
       // boolean toggle or layout enum that's easier to land via reload.
       if (data.cta_text !== undefined) {
-        const btn = document.querySelector(
-          "[data-testid='product-actions'] button, [data-testid='product-actions'] [type='submit']"
+        // `[data-testid='product-actions']` never existed in the storefront —
+        // this selector matched nothing, so the CTA edit was silently dropped
+        // while the badge read "Connected". The add-to-cart button carries
+        // `data-testid='add-product-button'`, and its label is only editable
+        // copy in one of its three branches, which is what `product-cta` marks.
+        // When the button is showing "Select a variant" / "Out of stock" the
+        // marker is absent and there is deliberately nothing to patch — a
+        // reload would render the same state, so doing nothing is correct.
+        const label = document.querySelector(
+          "[data-testid='add-product-button'] [data-theme-el='product-cta']"
         ) as HTMLElement | null
-        if (btn) btn.textContent = (data.cta_text as string) || btn.textContent
+        // Clearing the field falls back to the storefront default, exactly as
+        // the server render does (`ctaText || "Add to cart"`) — keeping the
+        // previous text would preview a value that will not survive a reload.
+        if (label) label.textContent = (data.cta_text as string) || "Add to cart"
       }
       if (data.related_heading !== undefined) {
+        // Same silent-drop as the CTA above: the related-products heading is a
+        // <span>, so the old `h2, h3` selector never matched. Marked instead.
         const heading = document.querySelector(
-          "[data-testid='related-products-container'] h2, [data-testid='related-products-container'] h3"
+          "[data-testid='related-products-container'] [data-theme-el='related-heading']"
         ) as HTMLElement | null
-        if (heading) heading.textContent = data.related_heading as string
+        if (heading) {
+          heading.textContent =
+            (data.related_heading as string) || "Related products"
+        }
       }
 
       // sample_product_name / sample_product_price are editor-only mockup

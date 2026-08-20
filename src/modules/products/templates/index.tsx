@@ -113,9 +113,14 @@ const ProductTemplate = async ({
           </ol>
         </nav>
       )}
+      {/* `data-theme-section` is what the theme editor's bridge outlines and
+          selects; the editor already maps a click on `product` to its
+          product_page panel. Without the attribute the product page rendered
+          inside the editor iframe had nothing selectable at all. */}
       <div
         className="content-container flex flex-col small:flex-row small:items-start py-6 relative"
         data-testid="product-container"
+        data-theme-section="product"
       >
         <div className="flex flex-col small:sticky small:top-48 small:py-0 small:max-w-[300px] w-full py-8 gap-y-6">
           <ProductInfo
