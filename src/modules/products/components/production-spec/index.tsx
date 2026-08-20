@@ -90,9 +90,14 @@ const ProductionSpec = async ({ product }: Props) => {
   return (
     <div className="flex flex-col gap-y-6 py-8">
       {!!rows.length && (
-        <div className="flex flex-col gap-y-3">
-          <Text className="text-ui-fg-base font-medium">Made to</Text>
-          <dl className="grid grid-cols-1 gap-x-8 gap-y-2 small:grid-cols-2">
+        <div className="flex flex-col gap-y-4">
+          <Text className="text-ui-fg-base font-medium text-base">Made to</Text>
+          {/* Three columns at desktop. This block used to live in a 300px
+              buying column where even two columns wrapped every row; it now
+              spans the page, so the row count is what should drive the column
+              count. `auto-rows-min` keeps a long partner-authored value from
+              stretching its neighbours. */}
+          <dl className="grid grid-cols-1 auto-rows-min gap-x-10 gap-y-1 small:grid-cols-2 large:grid-cols-3">
             {rows.map((row) => (
               <div
                 key={row.key}
