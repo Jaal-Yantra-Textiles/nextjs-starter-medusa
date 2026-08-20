@@ -5,6 +5,7 @@ import { getRegion } from "@lib/data/regions"
 import { getWebsite } from "@lib/data/website"
 import { buildLocalizedAlternates, cleanMetaDescription } from "@lib/util/seo"
 import ProductTemplate from "@modules/products/templates"
+import ThemeEditorBridge from "@modules/layout/components/theme-editor-bridge"
 
 import { HttpTypes } from "@medusajs/types"
 
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic"
 
 type Props = {
   params: Promise<{ countryCode: string; handle: string }>
-  searchParams: Promise<{ v_id?: string }>
+  searchParams: Promise<{ v_id?: string; theme_editor?: string }>
 }
 
 function getImagesForVariant(
@@ -92,6 +93,7 @@ export default async function ProductPage(props: Props) {
   const searchParams = await props.searchParams
 
   const selectedVariantId = searchParams.v_id
+  const isThemeEditor = searchParams.theme_editor === "true"
 
   if (!region) {
     notFound()
@@ -102,7 +104,7 @@ export default async function ProductPage(props: Props) {
       countryCode: params.countryCode,
       queryParams: { handle: params.handle },
     }).then(({ response }) => response.products[0]),
-    getWebsite().catch(() => null),
+    getWebsite(undefined, { noCache: isThemeEditor }).catch(() => null),
   ])
 
   if (!pricedProduct) {
@@ -112,12 +114,15 @@ export default async function ProductPage(props: Props) {
   const images = getImagesForVariant(pricedProduct, selectedVariantId)
 
   return (
-    <ProductTemplate
-      product={pricedProduct}
-      region={region}
-      countryCode={params.countryCode}
-      images={images}
-      theme={website?.theme}
-    />
+    <>
+      <ProductTemplate
+        product={pricedProduct}
+        region={region}
+        countryCode={params.countryCode}
+        images={images}
+        theme={website?.theme}
+      />
+      {isThemeEditor && <ThemeEditorBridge />}
+    </>
   )
 }
