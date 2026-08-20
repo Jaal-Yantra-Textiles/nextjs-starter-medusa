@@ -49,6 +49,16 @@ const ProductTemplate = async ({
   const galleryPosition = pt?.gallery_position
   const descriptionLayout = pt?.description_layout ?? "accordion"
 
+  // The band renders the same spec under the same "Made to" label, so only one
+  // of the two may claim it. The band wins when the theme asked for it: a
+  // partner who arranged their band deliberately should not have a second copy
+  // appear above it.
+  const bandShowsSpec =
+    pt?.detail_band?.enabled === true &&
+    (pt.detail_band.blocks ?? []).some(
+      (b) => b.source === "spec" && b.enabled !== false
+    )
+
   const breadcrumbTrail: Array<{ name: string; path: string }> = [
     { name: "Home", path: `/${countryCode}` },
     ...(product.collection
@@ -155,13 +165,31 @@ const ProductTemplate = async ({
             }
           >
             <ProductActionsWrapper id={product.id} region={region} ctaText={pt?.cta_text} />
-            {/* #1349 — what the piece is made to, and (when the partner takes
-                the work) the form to have one woven in a chosen colour.
-                Renders nothing when the product has no spec. */}
-            <ProductionSpec product={product} />
           </Suspense>
         </div>
       </div>
+      {/* "Made to" used to sit in the buying column, where a two-column
+          definition list had 300px to live in and every row wrapped. It is
+          reference detail about the cloth, not a buying control — the ordering
+          controls moved out to the buying column in #1365 and this is what was
+          left — so it belongs below the gallery at full width, where the rows
+          can breathe and a buyer reads it after the images rather than beside
+          them.
+
+          Suppressed when the theme's detail band already carries a `spec`
+          block: that block's default label is "Made to" and its content is the
+          same spec, so rendering both would print the section twice under one
+          heading. */}
+      {!bandShowsSpec && (
+        <div
+          className="content-container mt-6 small:mt-10"
+          data-testid="product-made-to"
+        >
+          <Suspense fallback={null}>
+            <ProductionSpec product={product} />
+          </Suspense>
+        </div>
+      )}
       {/* #1364 — the band that fills the space between the three-column row
           and Related Products. Renders nothing unless the theme turned it on
           AND this product can fill at least one of its blocks. */}
