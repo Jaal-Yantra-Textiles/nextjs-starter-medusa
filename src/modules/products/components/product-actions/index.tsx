@@ -322,11 +322,17 @@ export default function ProductActions({
           isLoading={isAdding}
           data-testid="add-product-button"
         >
-          {needsVariantSelection
-            ? "Select a variant"
-            : !inStock || !isValidVariant
-            ? "Out of stock"
-            : ctaText || "Add to cart"}
+          {needsVariantSelection ? (
+            "Select a variant"
+          ) : !inStock || !isValidVariant ? (
+            "Out of stock"
+          ) : (
+            /* Only the call-to-action branch is theme-editable, so only it
+               carries the marker. "Select a variant" / "Out of stock" are
+               states, not copy — the editor's live preview must not overwrite
+               them with the partner's CTA text. */
+            <span data-theme-el="product-cta">{ctaText || "Add to cart"}</span>
+          )}
         </Button>
         {needsVariantSelection && (
           <Text
