@@ -40,6 +40,8 @@ type IframeToAdminMessage =
       field: string
       value: string
     }
+  | { type: "BLOCK_REORDERED"; orderedIds: string[] }
+  | { type: "REQUEST_ADD_BLOCK_AT"; afterBlockId: string | null }
 
 interface VisualEditorBridgeProps {
   blocks: Array<{
@@ -215,6 +217,82 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         color: rgba(0, 0, 0, 0.3);
         font-style: italic;
       }
+      .ve-drag-handle {
+        position: absolute;
+        top: -10px;
+        right: 0;
+        width: 28px;
+        height: 28px;
+        background: rgb(59, 130, 246);
+        color: white;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        font-size: 14px;
+        z-index: 10000;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+        user-select: none;
+      }
+      .ve-selected .ve-drag-handle {
+        opacity: 1;
+      }
+      .ve-drag-handle:hover {
+        background: rgb(37, 99, 235);
+        cursor: grabbing;
+      }
+      [data-block-id].ve-dragging {
+        opacity: 0.4;
+        outline: 2px dashed rgb(59, 130, 246) !important;
+      }
+      [data-block-id].ve-drop-target {
+        outline: 2px solid rgb(34, 197, 94) !important;
+        outline-offset: 4px;
+      }
+      .ve-drop-indicator {
+        height: 4px;
+        background: rgb(34, 197, 94);
+        margin: 4px 0;
+        border-radius: 2px;
+        opacity: 0;
+        transition: opacity 0.1s ease;
+      }
+      .ve-drop-indicator.ve-drop-show {
+        opacity: 1;
+      }
+      .ve-insert-handle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 24px;
+        margin: 4px 0;
+        opacity: 0;
+        transition: opacity 0.15s ease;
+      }
+      .ve-insert-handle:hover {
+        opacity: 1;
+      }
+      .ve-insert-handle button {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 2px solid rgb(59, 130, 246);
+        background: white;
+        color: rgb(59, 130, 246);
+        font-size: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        padding: 0;
+        line-height: 1;
+      }
+      .ve-insert-handle button:hover {
+        background: rgb(59, 130, 246);
+        color: white;
+      }
     `
     document.head.appendChild(style)
     return () => {
@@ -338,6 +416,162 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
     },
     [disableInlineEditing]
   )
+
+  // --- Drag and drop reordering ---
+  const dragSourceRef = useRef<string | null>(null)
+
+  const addDragHandles = useCallback(() => {
+    const blockEls = document.querySelectorAll("[data-block-id]") as NodeListOf<HTMLElement>
+    blockEls.forEach((el) => {
+      if (el.querySelector(".ve-drag-handle")) return
+      const handle = document.createElement("div")
+      handle.className = "ve-drag-handle"
+      handle.textContent = "\u2630"
+      handle.title = "Drag to reorder"
+      handle.draggable = true
+
+      handle.addEventListener("dragstart", (e) => {
+        const blockEl = handle.closest("[data-block-id]") as HTMLElement
+        const blockId = blockEl.dataset.blockId || ""
+        dragSourceRef.current = blockId
+        blockEl.classList.add("ve-dragging")
+        e.dataTransfer?.setData("text/plain", blockId)
+        e.dataTransfer!.effectAllowed = "move"
+      })
+
+      handle.addEventListener("dragend", () => {
+        const blockEl = handle.closest("[data-block-id]") as HTMLElement
+        blockEl?.classList.remove("ve-dragging")
+        document.querySelectorAll(".ve-drop-target").forEach((el) =>
+          el.classList.remove("ve-drop-target")
+        )
+        document.querySelectorAll(".ve-drop-show").forEach((el) =>
+          el.classList.remove("ve-drop-show")
+        )
+        dragSourceRef.current = null
+      })
+
+      el.style.position = "relative"
+      el.appendChild(handle)
+    })
+  }, [])
+
+  const setupDragDrop = useCallback(() => {
+    const container = document.querySelector(".space-y-8")
+    if (!container) return
+
+    const handleDragOver = (e: DragEvent) => {
+      if (!dragSourceRef.current) return
+      e.preventDefault()
+      e.dataTransfer!.dropEffect = "move"
+
+      const blockEl = (e.target as HTMLElement).closest(
+        "[data-block-id]"
+      ) as HTMLElement | null
+      if (blockEl && blockEl.dataset.blockId !== dragSourceRef.current) {
+        document.querySelectorAll(".ve-drop-target").forEach((el) =>
+          el.classList.remove("ve-drop-target")
+        )
+        blockEl.classList.add("ve-drop-target")
+      }
+    }
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault()
+      if (!dragSourceRef.current) return
+
+      const targetBlock = (e.target as HTMLElement).closest(
+        "[data-block-id]"
+      ) as HTMLElement | null
+      if (!targetBlock || targetBlock.dataset.blockId === dragSourceRef.current) {
+        document.querySelectorAll(".ve-drop-target").forEach((el) =>
+          el.classList.remove("ve-drop-target")
+        )
+        return
+      }
+
+      // Visually reorder: insert dragged block before/after the target
+      const sourceEl = getBlockById(dragSourceRef.current)
+      if (!sourceEl) return
+
+      const rect = targetBlock.getBoundingClientRect()
+      const midpoint = rect.top + rect.height / 2
+      if (e.clientY < midpoint) {
+        targetBlock.parentNode?.insertBefore(sourceEl, targetBlock)
+      } else {
+        targetBlock.parentNode?.insertBefore(sourceEl, targetBlock.nextSibling)
+      }
+
+      // Collect new order and post to parent
+      const orderedIds = Array.from(
+        document.querySelectorAll("[data-block-id]")
+      ).map((el) => (el as HTMLElement).dataset.blockId || "")
+
+      sendToParent({ type: "BLOCK_REORDERED", orderedIds })
+
+      targetBlock.classList.remove("ve-drop-target")
+    }
+
+    document.addEventListener("dragover", handleDragOver)
+    document.addEventListener("drop", handleDrop)
+
+    return () => {
+      document.removeEventListener("dragover", handleDragOver)
+      document.removeEventListener("drop", handleDrop)
+    }
+  }, [])
+
+  // --- Insert handles between blocks ---
+  const addInsertHandles = useCallback(() => {
+    const container = document.querySelector(".space-y-8")
+    if (!container) return
+
+    // Remove existing handles
+    container.querySelectorAll(".ve-insert-handle").forEach((el) => el.remove())
+
+    const blockEls = Array.from(
+      container.querySelectorAll("[data-block-id]")
+    ) as HTMLElement[]
+
+    blockEls.forEach((blockEl, idx) => {
+      // Insert handle before this block
+      const handle = document.createElement("div")
+      handle.className = "ve-insert-handle"
+      const btn = document.createElement("button")
+      btn.textContent = "+"
+      btn.title = "Add block here"
+      btn.addEventListener("click", (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const prevBlockId = idx > 0 ? blockEls[idx - 1].dataset.blockId || null : null
+        sendToParent({
+          type: "REQUEST_ADD_BLOCK_AT",
+          afterBlockId: prevBlockId,
+        })
+      })
+      handle.appendChild(btn)
+      container.insertBefore(handle, blockEl)
+    })
+
+    // Insert handle after the last block
+    if (blockEls.length > 0) {
+      const handle = document.createElement("div")
+      handle.className = "ve-insert-handle"
+      const btn = document.createElement("button")
+      btn.textContent = "+"
+      btn.title = "Add block here"
+      btn.addEventListener("click", (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        sendToParent({
+          type: "REQUEST_ADD_BLOCK_AT",
+          afterBlockId: blockEls[blockEls.length - 1].dataset.blockId || null,
+        })
+      })
+      handle.appendChild(btn)
+      container.appendChild(handle)
+    }
+  }, [])
 
   const updateBlockPreview = useCallback(
     (
@@ -485,16 +719,19 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
     }
   }, [selectBlock, highlightBlock, clearHighlight])
 
-  // Send ready signal on mount
+  // Send ready signal on mount + setup drag/drop and insert handles
   useEffect(() => {
     const timer = setTimeout(() => {
       sendToParent({
         type: "VISUAL_EDITOR_READY",
         blocks: collectBlockInfo(),
       })
+      addDragHandles()
+      addInsertHandles()
+      setupDragDrop()
     }, 300)
     return () => clearTimeout(timer)
-  }, [])
+  }, [addDragHandles, addInsertHandles, setupDragDrop])
 
   // Disable navigation in editor mode
   useEffect(() => {
