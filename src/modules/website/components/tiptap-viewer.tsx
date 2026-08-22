@@ -45,6 +45,14 @@ function textWithMarks(textNode: any): string {
   }, txt)
 }
 
+function textAlignClass(attrs?: any): string {
+  const align = attrs?.textAlign
+  if (align === "center") return " text-center"
+  if (align === "right") return " text-right"
+  if (align === "left") return " text-left"
+  return ""
+}
+
 function renderNode(node: any): string {
   if (!node) return ""
   if (node.type === "text") {
@@ -54,10 +62,10 @@ function renderNode(node: any): string {
   switch (node.type) {
     case "heading": {
       const level = Math.min(Math.max(node.attrs?.level || 2, 1), 6)
-      return `<h${level} class="mb-6 mt-8">${children}</h${level}>`
+      return `<h${level} class="mb-6 mt-8${textAlignClass(node.attrs)}">${children}</h${level}>`
     }
     case "paragraph":
-      return children ? `<p class="mb-4">${children}</p>` : "<p></p>"
+      return children ? `<p class="mb-4${textAlignClass(node.attrs)}">${children}</p>` : "<p></p>"
     case "bulletList":
       return `<ul class="mb-4 ml-6 list-disc">${children}</ul>`
     case "orderedList":
@@ -65,13 +73,13 @@ function renderNode(node: any): string {
     case "listItem":
       return `<li class="mb-2">${children}</li>`
     case "blockquote":
-      return `<blockquote>${children}</blockquote>`
+      return `<blockquote class="border-l-4 border-ui-border-strong pl-4 italic my-4${textAlignClass(node.attrs)}">${children}</blockquote>`
     case "codeBlock": {
       const text = (node.content || [])
         .filter((n: any) => n.type === "text")
         .map((n: any) => escapeHtml(n.text || ""))
         .join("")
-      return `<pre><code>${text}</code></pre>`
+      return `<pre class="bg-ui-bg-subtle rounded-md p-4 overflow-x-auto"><code>${text}</code></pre>`
     }
     case "hardBreak":
       return "<br/>"
@@ -82,6 +90,18 @@ function renderNode(node: any): string {
       return src
         ? `<img src="${src}" alt="${alt}" class="${cls}" />`
         : ""
+    }
+    case "youtube":
+    case "vimeo":
+    case "embed": {
+      const src = escapeHtml(node.attrs?.src || "")
+      if (!src) return ""
+      return `<div class="tiptap-video-wrapper relative my-4" style="padding-bottom: 56.25%; height: 0; overflow: hidden;"><iframe src="${src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;"></iframe></div>`
+    }
+    case "video": {
+      const src = escapeHtml(node.attrs?.src || "")
+      if (!src) return ""
+      return `<video controls class="w-full rounded-md my-4"><source src="${src}" /></video>`
     }
     default:
       return children
