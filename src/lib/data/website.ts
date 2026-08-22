@@ -348,12 +348,19 @@ export async function getWebsitePage(
   slug: string
 ): Promise<PublicWebsitePage> {
   const resolvedDomain = domain || (await getStorefrontDomain())
-  const next = { ...(await getCacheOptions("website_page")) }
+
+  const next: Record<string, unknown> = {
+    ...(await getCacheOptions("website_page")),
+  }
+  if (Number.isFinite(WEBSITE_CACHE_TTL_SECONDS) && WEBSITE_CACHE_TTL_SECONDS > 0) {
+    next.revalidate = WEBSITE_CACHE_TTL_SECONDS
+  }
+
   return sdk.client.fetch<PublicWebsitePage>(
     `/web/website/${resolvedDomain}/${slug}`,
     {
       next,
-      cache: "force-cache",
+      cache: WEBSITE_CACHE_TTL_SECONDS > 0 ? "force-cache" : "no-store",
     }
   )
 }

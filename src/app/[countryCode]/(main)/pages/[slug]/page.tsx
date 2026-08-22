@@ -43,6 +43,7 @@ export default async function Page({
   }
 
   const renderHero = (
+    blockId: string | undefined,
     title?: string,
     subtitle?: string,
     align: "left" | "center" = "center"
@@ -53,13 +54,17 @@ export default async function Page({
           className={`content-container py-10 md:py-16 ${align === "left" ? "text-left" : "text-center"}`}
         >
           {title && (
-            <h1 className="mb-3 text-2xl md:text-4xl font-semibold tracking-tight">
+            <h1
+              className="mb-3 text-2xl md:text-4xl font-semibold tracking-tight"
+              {...(isVisualEditor ? { "data-field": "title" } : {})}
+            >
               {title}
             </h1>
           )}
           {subtitle && (
             <p
               className={`${align === "left" ? "max-w-xl" : "max-w-xl mx-auto"} text-ui-fg-subtle text-sm md:text-base`}
+              {...(isVisualEditor ? { "data-field": "subtitle" } : {})}
             >
               {subtitle}
             </p>
@@ -69,88 +74,447 @@ export default async function Page({
     </section>
   )
 
-  const renderFormattedBody = (body: string) => {
-    const textBlocks = body.split(/\n\n+/)
-    return (
-      <div className="space-y-6 text-ui-fg-subtle">
-        {textBlocks.map((block, idx) => {
-          const lines = block.split(/\n/).filter(Boolean)
-          if (lines.length === 0) return null
-
-          if (block.startsWith("# ")) {
-            return (
-              <h2
-                key={idx}
-                className="text-xl md:text-2xl font-semibold m-0"
-              >
-                {block.replace(/^#\s+/, "")}
-              </h2>
-            )
-          }
-          if (block.startsWith("## ")) {
-            return (
-              <h3 key={idx} className="text-lg md:text-xl font-semibold m-0">
-                {block.replace(/^##\s+/, "")}
-              </h3>
-            )
-          }
-
-          const isUL = lines.every((l) => /^[-*]\s+/.test(l))
-          if (isUL) {
-            return (
-              <ul key={idx} className="list-disc ml-6 space-y-1">
-                {lines.map((l, i) => (
-                  <li key={i}>{l.replace(/^[-*]\s+/, "")}</li>
-                ))}
-              </ul>
-            )
-          }
-
-          const isOL = lines.every((l) => /^\d+\.\s+/.test(l))
-          if (isOL) {
-            return (
-              <ol key={idx} className="list-decimal ml-6 space-y-1">
-                {lines.map((l, i) => (
-                  <li key={i}>{l.replace(/^\d+\.\s+/, "")}</li>
-                ))}
-              </ol>
-            )
-          }
-
-          return (
-            <p
-              key={idx}
-              className={idx === 0 ? "text-base md:text-lg" : undefined}
-            >
-              {block}
-            </p>
-          )
-        })}
-      </div>
-    )
-  }
-
-  const renderMain = (body?: unknown, sectionTitle?: string) => {
-    // TipTap JSON
+  const renderMain = (
+    body?: unknown,
+    sectionTitle?: string,
+    blockId?: string
+  ) => {
+    const fieldProps = isVisualEditor
+      ? { "data-field": "body" as const }
+      : {}
+    const titleProps = isVisualEditor
+      ? { "data-field": "title" as const }
+      : {}
     if (body && typeof body === "object") {
       return (
         <section className="prose prose-neutral max-w-none">
-          {sectionTitle && <h2 className="mt-0 mb-6">{sectionTitle}</h2>}
-          <TipTapViewer doc={body} className="tiptap-content" />
+          {sectionTitle && (
+            <h2 className="mt-0 mb-6" {...titleProps}>{sectionTitle}</h2>
+          )}
+          <div {...fieldProps}>
+            <TipTapViewer doc={body} className="tiptap-content" />
+          </div>
         </section>
       )
     }
 
-    // Plain string
     const text = typeof body === "string" ? body : ""
     return (
       <section className="prose prose-neutral max-w-none prose-p:mb-4 prose-headings:mb-6 prose-ul:mb-4 prose-ol:mb-4">
-        {sectionTitle && <h2 className="mt-0 mb-6">{sectionTitle}</h2>}
+        {sectionTitle && (
+          <h2 className="mt-0 mb-6" {...titleProps}>{sectionTitle}</h2>
+        )}
         {text ? (
-          renderFormattedBody(text)
+          <div {...fieldProps}>
+            <p className="text-base md:text-lg">{text}</p>
+          </div>
         ) : (
           <p className="text-ui-fg-subtle">No content</p>
         )}
+      </section>
+    )
+  }
+
+  const renderHeader = (content: any) => {
+    const links: Array<{ label?: string; href?: string }> =
+      content?.links || []
+    return (
+      <nav className="w-full border-b border-ui-border-base py-4">
+        <div className="content-container flex items-center justify-between">
+          <span
+            className="font-semibold text-lg"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content?.title || ""}
+          </span>
+          <ul className="flex items-center gap-x-6">
+            {links.map((link, i) => (
+              <li key={i}>
+                <a
+                  href={link.href || "#"}
+                  className="text-sm text-ui-fg-subtle hover:text-ui-fg-base"
+                  {...(isVisualEditor ? { "data-field": `links.${i}.label` } : {})}
+                >
+                  {link.label || "Link"}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </nav>
+    )
+  }
+
+  const renderFooter = (content: any) => {
+    const links: Array<{ label?: string; href?: string }> =
+      content?.links || []
+    return (
+      <footer className="w-full border-t border-ui-border-base py-6 mt-8">
+        <div className="content-container text-center">
+          {content?.text && (
+            <p
+              className="text-sm text-ui-fg-subtle mb-4"
+              {...(isVisualEditor ? { "data-field": "text" } : {})}
+            >
+              {content.text}
+            </p>
+          )}
+          {links.length > 0 && (
+            <ul className="flex items-center justify-center gap-x-6">
+              {links.map((link, i) => (
+                <li key={i}>
+                  <a
+                    href={link.href || "#"}
+                    className="text-xs text-ui-fg-muted hover:text-ui-fg-base"
+                    {...(isVisualEditor ? { "data-field": `links.${i}.label` } : {})}
+                  >
+                    {link.label || "Link"}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </footer>
+    )
+  }
+
+  const renderGallery = (content: any) => {
+    const images: Array<{ url?: string; alt?: string }> =
+      content?.images || []
+    return (
+      <section>
+        {content?.title && (
+          <h2
+            className="text-xl md:text-2xl font-semibold mb-4"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h2>
+        )}
+        {images.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4" data-field="images">
+            {images.map((img, i) => (
+              <div key={i} className="rounded-lg overflow-hidden bg-ui-bg-subtle">
+                {img.url ? (
+                  <img
+                    src={img.url}
+                    alt={img.alt || ""}
+                    className="w-full h-48 object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-48 flex items-center justify-center text-ui-fg-muted text-sm">
+                    No image
+                  </div>
+                )}
+                {img.alt && (
+                  <p className="text-xs text-ui-fg-muted p-2 text-center">{img.alt}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="text-center py-8 text-ui-fg-muted text-sm border-2 border-dashed border-ui-border-base rounded-lg"
+            data-field="images"
+          >
+            No images in gallery
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  const renderFeature = (content: any) => {
+    const features: Array<{
+      title?: string
+      description?: string
+      icon?: string
+    }> = content?.features || []
+    const single = features.length === 0 && (content?.title || content?.description)
+    if (single) {
+      return (
+        <section className="rounded-lg border border-ui-border-base p-6">
+          {content.title && (
+            <h3
+              className="text-lg font-semibold mb-2"
+              {...(isVisualEditor ? { "data-field": "title" } : {})}
+            >
+              {content.title}
+            </h3>
+          )}
+          {content.description && (
+            <p
+              className="text-sm text-ui-fg-subtle"
+              {...(isVisualEditor ? { "data-field": "description" } : {})}
+            >
+              {content.description}
+            </p>
+          )}
+        </section>
+      )
+    }
+    return (
+      <section>
+        {content?.title && (
+          <h2
+            className="text-xl md:text-2xl font-semibold mb-4"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h2>
+        )}
+        {features.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {features.map((f, i) => (
+              <div key={i} className="rounded-lg border border-ui-border-base p-5">
+                {f.icon && (
+                  <div className="text-2xl mb-2" data-field={`features.${i}.icon`}>
+                    {f.icon}
+                  </div>
+                )}
+                <h3
+                  className="font-semibold mb-1"
+                  {...(isVisualEditor ? { "data-field": `features.${i}.title` } : {})}
+                >
+                  {f.title || ""}
+                </h3>
+                <p
+                  className="text-sm text-ui-fg-subtle"
+                  {...(isVisualEditor ? { "data-field": `features.${i}.description` } : {})}
+                >
+                  {f.description || ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  const renderTestimonial = (content: any) => {
+    const testimonials: Array<{
+      quote?: string
+      author?: string
+      role?: string
+      avatar_url?: string
+    }> = content?.testimonials || []
+    const single =
+      testimonials.length === 0 && (content?.quote || content?.author)
+    if (single) {
+      return (
+        <blockquote className="rounded-lg border-l-4 border-ui-border-strong pl-6 py-4">
+          {content.quote && (
+            <p
+              className="text-lg italic text-ui-fg-base mb-2"
+              {...(isVisualEditor ? { "data-field": "quote" } : {})}
+            >
+              "{content.quote}"
+            </p>
+          )}
+          {content.author && (
+            <footer className="text-sm text-ui-fg-muted">
+              <span data-field={isVisualEditor ? "author" : undefined}>
+                — {content.author}
+              </span>
+              {content.role && (
+                <span className="text-ui-fg-muted">, {content.role}</span>
+              )}
+            </footer>
+          )}
+        </blockquote>
+      )
+    }
+    return (
+      <section>
+        {content?.title && (
+          <h2
+            className="text-xl md:text-2xl font-semibold mb-4"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h2>
+        )}
+        {testimonials.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {testimonials.map((t, i) => (
+              <blockquote
+                key={i}
+                className="rounded-lg border-l-4 border-ui-border-strong pl-6 py-4"
+              >
+                {t.quote && (
+                  <p className="text-lg italic text-ui-fg-base mb-2">
+                    "{t.quote}"
+                  </p>
+                )}
+                <footer className="text-sm text-ui-fg-muted">
+                  {t.avatar_url && (
+                    <img
+                      src={t.avatar_url}
+                      alt={t.author || ""}
+                      className="w-10 h-10 rounded-full inline-block mr-2 object-cover"
+                    />
+                  )}
+                  — {t.author || ""}
+                  {t.role && <span className="text-ui-fg-muted">, {t.role}</span>}
+                </footer>
+              </blockquote>
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  const renderProduct = (content: any) => {
+    return (
+      <section className="rounded-lg border border-ui-border-base p-6">
+        {content?.title && (
+          <h3
+            className="text-lg font-semibold mb-2"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h3>
+        )}
+        {content?.description && (
+          <p
+            className="text-sm text-ui-fg-subtle mb-3"
+            {...(isVisualEditor ? { "data-field": "description" } : {})}
+          >
+            {content.description}
+          </p>
+        )}
+        {content?.product_handle && (
+          <LocalizedClientLink
+            href={`/products/${content.product_handle}`}
+            className="text-sm text-ui-fg-base underline"
+          >
+            View Product
+          </LocalizedClientLink>
+        )}
+        {content?.product_id && !content?.product_handle && (
+          <p className="text-xs text-ui-fg-muted" data-field="product_id">
+            Product ID: {content.product_id}
+          </p>
+        )}
+        {!content?.product_handle && !content?.product_id && (
+          <p className="text-xs text-ui-fg-muted" data-field="product_id">
+            No product linked
+          </p>
+        )}
+      </section>
+    )
+  }
+
+  const renderContactForm = (content: any) => {
+    const fields: Array<{
+      name?: string
+      label?: string
+      type?: string
+      required?: boolean
+    }> = content?.fields || []
+    return (
+      <section className="max-w-md">
+        {content?.title && (
+          <h2
+            className="text-xl md:text-2xl font-semibold mb-2"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h2>
+        )}
+        {content?.description && (
+          <p
+            className="text-sm text-ui-fg-subtle mb-4"
+            {...(isVisualEditor ? { "data-field": "description" } : {})}
+          >
+            {content.description}
+          </p>
+        )}
+        <form className="space-y-4">
+          {fields.length > 0 ? (
+            fields.map((field, i) => (
+              <div key={i}>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  data-field={isVisualEditor ? `fields.${i}.label` : undefined}
+                >
+                  {field.label || field.name || "Field"}
+                  {field.required && <span className="text-red-500"> *</span>}
+                </label>
+                <input
+                  type={field.type || "text"}
+                  name={field.name || field.label || ""}
+                  required={field.required}
+                  disabled={isVisualEditor}
+                  className="w-full rounded-md border border-ui-border-base px-3 py-2 text-sm"
+                />
+              </div>
+            ))
+          ) : (
+            <>
+              <div>
+                <label className="block text-sm font-medium mb-1">Name</label>
+                <input
+                  type="text"
+                  disabled={isVisualEditor}
+                  className="w-full rounded-md border border-ui-border-base px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Email</label>
+                <input
+                  type="email"
+                  disabled={isVisualEditor}
+                  className="w-full rounded-md border border-ui-border-base px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Message</label>
+                <textarea
+                  disabled={isVisualEditor}
+                  className="w-full rounded-md border border-ui-border-base px-3 py-2 text-sm min-h-[100px]"
+                />
+              </div>
+            </>
+          )}
+          <button
+            type="button"
+            disabled={isVisualEditor}
+            className="rounded-md bg-ui-bg-base px-4 py-2 text-sm font-medium"
+          >
+            Send Message
+          </button>
+        </form>
+      </section>
+    )
+  }
+
+  const renderSection = (content: any) => {
+    return (
+      <section className="rounded-lg border border-ui-border-base p-6">
+        {content?.title && (
+          <h2
+            className="text-xl font-semibold mb-4"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h2>
+        )}
+        {content?.body && typeof content.body === "object" ? (
+          <div {...(isVisualEditor ? { "data-field": "body" } : {})}>
+            <TipTapViewer doc={content.body} className="tiptap-content" />
+          </div>
+        ) : content?.body && typeof content.body === "string" ? (
+          <p
+            className="text-sm text-ui-fg-subtle"
+            {...(isVisualEditor ? { "data-field": "body" } : {})}
+          >
+            {content.body}
+          </p>
+        ) : null}
       </section>
     )
   }
@@ -171,13 +535,6 @@ export default async function Page({
           order: Number(b?.order ?? idx),
         }))
     : []
-
-  const normalizeType = (raw?: string) => {
-    const t = (raw || "").toLowerCase()
-    if (t.includes("hero")) return "Hero"
-    if (t.includes("main")) return "Main"
-    return raw || ""
-  }
 
   return (
     <article className="content-container py-6 md:py-10">
@@ -212,73 +569,142 @@ export default async function Page({
       <div className="space-y-8">
         {blocks.length > 0 ? (
           blocks.map((block, idx) => {
-            const type = normalizeType(block.type as any)
-            const rawContent =
-              (block as any).content ?? (block as any)
+            const type = (block.type as string) || ""
+            const rawContent = (block as any).content ?? {}
 
             const blockAttrs =
               isVisualEditor && block.id
                 ? {
-                    "data-block-id": block.id,
-                    "data-block-type": block.type || type,
-                    "data-block-name": block.name || type,
+                    "data-block-id": block.id as string,
+                    "data-block-type": type,
+                    "data-block-name": (block.name as string) || type,
                   }
                 : {}
 
-            if (type === "Hero") {
-              const content = rawContent as {
-                title?: string
-                subtitle?: string
-                align?: "left" | "center"
-              }
-              return (
-                <div key={`hero-${idx}`} {...blockAttrs}>
-                  {renderHero(
-                    content?.title ?? page.title,
-                    content?.subtitle,
-                    content?.align || "center"
-                  )}
-                </div>
-              )
-            }
-            if (type === "Main") {
-              const content = rawContent as {
-                body?: unknown
-                title?: string
-              }
-              return (
-                <div key={`main-${idx}`} {...blockAttrs}>
-                  {renderMain(content?.body, content?.title)}
-                </div>
-              )
-            }
+            const key = `${type}-${idx}`
 
-            const c = rawContent as { title?: string; body?: string }
-            if (
-              typeof c?.title === "string" ||
-              typeof c?.body !== "undefined"
-            ) {
-              return (
-                <div key={`${block.type}-${idx}`} {...blockAttrs}>
-                  {renderMain(c.body as any, c.title)}
-                </div>
-              )
+            switch (type) {
+              case "Hero": {
+                const content = rawContent as {
+                  title?: string
+                  subtitle?: string
+                  align?: "left" | "center"
+                }
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderHero(
+                      block.id,
+                      content?.title ?? page.title,
+                      content?.subtitle,
+                      content?.align || "center"
+                    )}
+                  </div>
+                )
+              }
+              case "MainContent": {
+                const content = rawContent as {
+                  body?: unknown
+                  title?: string
+                }
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderMain(content?.body, content?.title, block.id)}
+                  </div>
+                )
+              }
+              case "Header": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderHeader(rawContent)}
+                  </div>
+                )
+              }
+              case "Footer": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderFooter(rawContent)}
+                  </div>
+                )
+              }
+              case "Gallery": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderGallery(rawContent)}
+                  </div>
+                )
+              }
+              case "Feature": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderFeature(rawContent)}
+                  </div>
+                )
+              }
+              case "Testimonial": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderTestimonial(rawContent)}
+                  </div>
+                )
+              }
+              case "Product": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderProduct(rawContent)}
+                  </div>
+                )
+              }
+              case "ContactForm": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderContactForm(rawContent)}
+                  </div>
+                )
+              }
+              case "Section": {
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderSection(rawContent)}
+                  </div>
+                )
+              }
+              case "Custom": {
+                const content = rawContent as {
+                  title?: string
+                  body?: unknown
+                }
+                return (
+                  <div key={key} {...blockAttrs}>
+                    {renderMain(content?.body, content?.title, block.id)}
+                  </div>
+                )
+              }
+              default: {
+                const c = rawContent as { title?: string; body?: unknown }
+                if (
+                  typeof c?.title === "string" ||
+                  typeof c?.body !== "undefined"
+                ) {
+                  return (
+                    <div key={key} {...blockAttrs}>
+                      {renderMain(c.body, c.title, block.id)}
+                    </div>
+                  )
+                }
+                return (
+                  <section
+                    key={key}
+                    className="p-4"
+                    {...blockAttrs}
+                  >
+                    <h2 className="m-0">{block.name || block.type}</h2>
+                    <pre className="text-sm text-ui-fg-subtle overflow-auto bg-ui-bg-subtle p-3 rounded mt-2">
+                      {JSON.stringify(block, null, 2)}
+                    </pre>
+                  </section>
+                )
+              }
             }
-
-            return (
-              <section
-                key={`${block.type}-${idx}`}
-                className="p-4"
-                {...blockAttrs}
-              >
-                <h2 className="m-0">{block.name || block.type}</h2>
-                {block && (
-                  <pre className="text-sm text-ui-fg-subtle overflow-auto bg-ui-bg-subtle p-3 rounded mt-2">
-                    {JSON.stringify(block, null, 2)}
-                  </pre>
-                )}
-              </section>
-            )
           })
         ) : (
           <p className="text-ui-fg-subtle">

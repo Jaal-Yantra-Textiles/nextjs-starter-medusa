@@ -31,6 +31,14 @@ function textWithMarks(textNode: any): string {
         return `<code>${acc}</code>`
       case "underline":
         return `<u>${acc}</u>`
+      case "link": {
+        const href = escapeHtml(m.attrs?.href || "")
+        const target = m.attrs?.target
+          ? ` target="${escapeHtml(m.attrs.target)}"`
+          : ""
+        const rel = ` rel="noopener noreferrer"`
+        return `<a href="${href}"${target}${rel}>${acc}</a>`
+      }
       default:
         return acc
     }
@@ -67,6 +75,14 @@ function renderNode(node: any): string {
     }
     case "hardBreak":
       return "<br/>"
+    case "image": {
+      const src = escapeHtml(node.attrs?.src || "")
+      const alt = escapeHtml(node.attrs?.alt || "")
+      const cls = "tiptap-image max-w-full h-auto rounded-md"
+      return src
+        ? `<img src="${src}" alt="${alt}" class="${cls}" />`
+        : ""
+    }
     default:
       return children
   }
