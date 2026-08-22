@@ -20,6 +20,8 @@ type AdminToIframeMessage =
       settings?: Record<string, unknown>
     }
   | { type: "SCROLL_TO_BLOCK"; blockId: string }
+  | { type: "ENABLE_INLINE_EDITING"; blockId: string }
+  | { type: "DISABLE_INLINE_EDITING" }
 
 type IframeToAdminMessage =
   | { type: "VISUAL_EDITOR_READY"; blocks: BlockInfo[] }
@@ -32,6 +34,12 @@ type IframeToAdminMessage =
   | { type: "BLOCK_HOVERED"; blockId: string | null }
   | { type: "BLOCKS_LOADED"; blocks: BlockInfo[] }
   | { type: "BLOCK_PREVIEW_RELOAD_NEEDED"; blockId: string }
+  | {
+      type: "BLOCK_FIELD_EDITED"
+      blockId: string
+      field: string
+      value: string
+    }
 
 interface VisualEditorBridgeProps {
   blocks: Array<{
@@ -190,6 +198,23 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         white-space: nowrap;
         font-family: system-ui, -apple-system, sans-serif;
       }
+      [data-field][contenteditable="true"] {
+        outline: 2px solid rgba(59, 130, 246, 0.6) !important;
+        outline-offset: 2px;
+        cursor: text !important;
+        border-radius: 2px;
+        min-height: 1em;
+      }
+      [data-field][contenteditable="true"]:focus {
+        outline: 2px solid rgb(59, 130, 246) !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        background: rgba(59, 130, 246, 0.03);
+      }
+      [data-field][contenteditable="true"]:empty::before {
+        content: "Click to edit...";
+        color: rgba(0, 0, 0, 0.3);
+        font-style: italic;
+      }
     `
     document.head.appendChild(style)
     return () => {
@@ -259,6 +284,61 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
     el.scrollIntoView({ behavior: "smooth", block: "center" })
   }, [])
 
+  // --- Inline editing ---
+  const editingBlockRef = useRef<string | null>(null)
+
+  const disableInlineEditing = useCallback(() => {
+    const prevId = editingBlockRef.current
+    if (prevId) {
+      const prev = getBlockById(prevId)
+      if (prev) {
+        prev.querySelectorAll('[data-field][contenteditable="true"]').forEach((el) => {
+          ;(el as HTMLElement).contentEditable = "false"
+        })
+      }
+    }
+    editingBlockRef.current = null
+  }, [])
+
+  const enableInlineEditing = useCallback(
+    (blockId: string) => {
+      // Disable editing on the previous block first
+      if (editingBlockRef.current && editingBlockRef.current !== blockId) {
+        disableInlineEditing()
+      }
+
+      const el = getBlockById(blockId)
+      if (!el) return
+
+      el.querySelectorAll("[data-field]").forEach((fieldEl) => {
+        const fe = fieldEl as HTMLElement
+        // Skip array fields (links.N.label, features.N.title) — those need UI controls
+        const fieldName = fe.dataset.field || ""
+        if (fieldName.includes(".")) return
+
+        fe.contentEditable = "true"
+
+        const handleBlur = () => {
+          const value = fe.innerText
+          sendToParent({
+            type: "BLOCK_FIELD_EDITED",
+            blockId,
+            field: fieldName,
+            value,
+          })
+        }
+
+        // Remove previous listener if any (avoid duplicates)
+        fe.removeEventListener("blur", (fe as any)._veBlurHandler)
+        ;(fe as any)._veBlurHandler = handleBlur
+        fe.addEventListener("blur", handleBlur)
+      })
+
+      editingBlockRef.current = blockId
+    },
+    [disableInlineEditing]
+  )
+
   const updateBlockPreview = useCallback(
     (
       blockId: string,
@@ -325,6 +405,7 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         case "SELECT_BLOCK":
           selectBlock(data.blockId)
           scrollToBlock(data.blockId)
+          enableInlineEditing(data.blockId)
           break
         case "HIGHLIGHT_BLOCK":
           highlightBlock(data.blockId)
@@ -335,12 +416,18 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         case "UPDATE_BLOCK_PREVIEW":
           updateBlockPreview(data.blockId, data.content, data.settings)
           break
+        case "ENABLE_INLINE_EDITING":
+          enableInlineEditing(data.blockId)
+          break
+        case "DISABLE_INLINE_EDITING":
+          disableInlineEditing()
+          break
       }
     }
 
     window.addEventListener("message", handleMessage)
     return () => window.removeEventListener("message", handleMessage)
-  }, [selectBlock, highlightBlock, scrollToBlock, updateBlockPreview])
+  }, [selectBlock, highlightBlock, scrollToBlock, updateBlockPreview, enableInlineEditing, disableInlineEditing])
 
   // Setup click and hover handlers on block elements
   useEffect(() => {
@@ -349,6 +436,15 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         "[data-block-id]"
       ) as HTMLElement | null
       if (!blockEl) return
+
+      // If clicking inside a contentEditable field, let it behave normally
+      const target = e.target as HTMLElement
+      if (
+        target.isContentEditable ||
+        target.closest('[contenteditable="true"]')
+      ) {
+        return
+      }
 
       e.preventDefault()
       e.stopPropagation()
