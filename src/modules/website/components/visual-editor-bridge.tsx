@@ -22,6 +22,7 @@ type AdminToIframeMessage =
   | { type: "SCROLL_TO_BLOCK"; blockId: string }
   | { type: "ENABLE_INLINE_EDITING"; blockId: string }
   | { type: "DISABLE_INLINE_EDITING" }
+  | { type: "INSERT_IMAGE_AT_CURSOR"; imageUrl: string }
 
 type IframeToAdminMessage =
   | { type: "VISUAL_EDITOR_READY"; blocks: BlockInfo[] }
@@ -39,9 +40,13 @@ type IframeToAdminMessage =
       blockId: string
       field: string
       value: string
+      isHtml?: boolean
     }
   | { type: "BLOCK_REORDERED"; orderedIds: string[] }
   | { type: "REQUEST_ADD_BLOCK_AT"; afterBlockId: string | null }
+  | { type: "REQUEST_IMAGE_UPLOAD"; blockId: string }
+  | { type: "TOOLBAR_COMMAND"; command: string }
+  | { type: "OPEN_BODY_EDITOR"; blockId: string; field: string }
 
 interface VisualEditorBridgeProps {
   blocks: Array<{
@@ -192,6 +197,9 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         transition: outline 0.15s ease, box-shadow 0.15s ease;
         cursor: pointer;
       }
+      [data-block-id].ve-selected {
+        cursor: default;
+      }
       [data-block-id]:hover {
         outline: 2px dashed rgba(59, 130, 246, 0.4);
         outline-offset: 2px;
@@ -220,10 +228,15 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         white-space: nowrap;
         font-family: system-ui, -apple-system, sans-serif;
       }
+      [data-field]:not([contenteditable="true"]) {
+        cursor: pointer;
+      }
       [data-field][contenteditable="true"] {
         outline: 2px solid rgba(59, 130, 246, 0.6) !important;
         outline-offset: 2px;
         cursor: text !important;
+        user-select: text !important;
+        -webkit-user-select: text !important;
         border-radius: 2px;
         min-height: 1em;
       }
@@ -313,12 +326,140 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         background: rgb(59, 130, 246);
         color: white;
       }
+      .ve-floating-toolbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 10001;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1px;
+        padding: 4px;
+        background: rgb(30, 41, 59);
+        border-radius: 8px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity 0.15s ease, transform 0.15s ease;
+        pointer-events: none;
+        max-width: 480px;
+      }
+      .ve-floating-toolbar.ve-toolbar-visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .ve-toolbar-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        padding: 0 6px;
+        border-radius: 4px;
+        background: transparent;
+        color: rgb(203, 213, 225);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        border: none;
+        white-space: nowrap;
+        transition: background 0.1s ease, color 0.1s ease;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      .ve-toolbar-btn:hover {
+        background: rgb(51, 65, 85);
+        color: white;
+      }
+      .ve-toolbar-btn.ve-active {
+        background: rgb(59, 130, 246);
+        color: white;
+      }
+      .ve-toolbar-divider {
+        width: 1px;
+        height: 20px;
+        background: rgb(51, 65, 85);
+        margin: 4px 2px;
+      }
     `
     document.head.appendChild(style)
     return () => {
       style.remove()
     }
   }, [])
+
+  // --- Floating formatting toolbar ---
+  const toolbarRef = useRef<HTMLDivElement | null>(null)
+
+  const hideFloatingToolbar = useCallback(() => {
+    if (toolbarRef.current) {
+      toolbarRef.current.classList.remove("ve-toolbar-visible")
+    }
+  }, [])
+
+  const showFloatingToolbar = useCallback((blockEl: HTMLElement) => {
+    const hasRichText = blockEl.querySelector(
+      '[data-field="body"], [data-field="body"] p, [data-field="body"] h1, [data-field="body"] h2, [data-field="body"] h3'
+    ) || blockEl.querySelector('[data-field="body"]')
+
+    if (!hasRichText) {
+      hideFloatingToolbar()
+      return
+    }
+
+    let toolbar = toolbarRef.current
+    if (!toolbar) {
+      toolbar = document.createElement("div")
+      toolbar.className = "ve-floating-toolbar"
+      toolbar.style.position = "fixed"
+
+      const buttons: Array<{ label: string; command?: string; action?: () => void }> = [
+        { label: "H1", command: "toggleHeading1" },
+        { label: "H2", command: "toggleHeading2" },
+        { label: "H3", command: "toggleHeading3" },
+        { label: "B", command: "toggleBold" },
+        { label: "I", command: "toggleItalic" },
+        { label: "U", command: "toggleUnderline" },
+        { label: "UL", command: "toggleBulletList" },
+        { label: "OL", command: "toggleOrderedList" },
+        { label: "Quote", command: "toggleBlockquote" },
+        { label: "Code", command: "toggleCodeBlock" },
+        { label: "Link", command: "setLink" },
+        { label: "Image", command: "addImage" },
+        { label: "Upload", command: "triggerUpload" },
+        { label: "Video", command: "addVideo" },
+        { label: "Left", command: "alignLeft" },
+        { label: "Center", command: "alignCenter" },
+        { label: "Right", command: "alignRight" },
+      ]
+
+      buttons.forEach((btn) => {
+        const el = document.createElement("button")
+        el.className = "ve-toolbar-btn"
+        el.textContent = btn.label
+        el.addEventListener("mousedown", (e) => {
+          e.preventDefault()
+          if (btn.command) {
+            sendToParent({ type: "TOOLBAR_COMMAND", command: btn.command } as any)
+          }
+        })
+        toolbar!.appendChild(el)
+      })
+
+      document.body.appendChild(toolbar)
+      toolbarRef.current = toolbar
+    }
+
+    const rect = blockEl.getBoundingClientRect()
+    toolbar.style.top = `${Math.max(8, rect.top - 56)}px`
+    const toolbarWidth = toolbar.offsetWidth || 420
+    const left = Math.max(8, Math.min(rect.left, window.innerWidth - toolbarWidth - 8))
+    toolbar.style.left = `${left}px`
+
+    requestAnimationFrame(() => {
+      toolbar!.classList.add("ve-toolbar-visible")
+    })
+  }, [hideFloatingToolbar])
 
   const clearSelection = useCallback(() => {
     const prev = selectedRef.current
@@ -329,7 +470,8 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
       prev.querySelector(".ve-block-label")?.remove()
     }
     selectedRef.current = null
-  }, [])
+    hideFloatingToolbar()
+  }, [hideFloatingToolbar])
 
   const clearHighlight = useCallback(() => {
     const prev = highlightedRef.current
@@ -357,8 +499,10 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         el.style.position = "relative"
         el.appendChild(label)
       }
+
+      showFloatingToolbar(el)
     },
-    [clearSelection]
+    [clearSelection, showFloatingToolbar]
   )
 
   const highlightBlock = useCallback(
@@ -392,11 +536,21 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
       if (prev) {
         prev.querySelectorAll('[data-field][contenteditable="true"]').forEach((el) => {
           ;(el as HTMLElement).contentEditable = "false"
+          ;(el as HTMLElement).style.outline = ""
+          ;(el as HTMLElement).style.outlineOffset = ""
+        })
+        prev.querySelectorAll('[data-field]').forEach((el) => {
+          const fe = el as HTMLElement
+          if (fe.dataset.field === "body") {
+            fe.style.outline = ""
+            fe.style.cursor = ""
+          }
         })
       }
     }
     editingBlockRef.current = null
-  }, [])
+    hideFloatingToolbar()
+  }, [hideFloatingToolbar])
 
   const enableInlineEditing = useCallback(
     (blockId: string) => {
@@ -410,31 +564,56 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
 
       el.querySelectorAll("[data-field]").forEach((fieldEl) => {
         const fe = fieldEl as HTMLElement
-        // Skip array fields (links.N.label, features.N.title) — those need UI controls
         const fieldName = fe.dataset.field || ""
-        if (fieldName.includes(".")) return
 
-        fe.contentEditable = "true"
+        // Rich text fields open a drawer editor; everything else is inline contentEditable
+        const isRichText = fieldName === "body"
 
-        const handleBlur = () => {
-          const value = fe.innerText
-          sendToParent({
-            type: "BLOCK_FIELD_EDITED",
-            blockId,
-            field: fieldName,
-            value,
-          })
+        if (isRichText) {
+          fe.style.cursor = "pointer"
+          fe.style.outline = "2px dashed rgba(59, 130, 246, 0.5)"
+          fe.style.outlineOffset = "2px"
+          fe.title = "Click to open rich text editor"
+
+          const handleClick = (e: MouseEvent) => {
+            e.preventDefault()
+            e.stopPropagation()
+            sendToParent({
+              type: "OPEN_BODY_EDITOR",
+              blockId,
+              field: fieldName,
+            } as any)
+          }
+
+          fe.removeEventListener("click", (fe as any)._veRichClickHandler)
+          ;(fe as any)._veRichClickHandler = handleClick
+          fe.addEventListener("click", handleClick)
+        } else {
+          fe.style.cursor = "text"
+          fe.contentEditable = "true"
+          fe.style.outline = "1px solid rgba(59, 130, 246, 0.3)"
+          fe.style.outlineOffset = "1px"
+
+          const handleBlur = () => {
+            const value = fe.innerText
+            sendToParent({
+              type: "BLOCK_FIELD_EDITED",
+              blockId,
+              field: fieldName,
+              value,
+            })
+          }
+
+          fe.removeEventListener("blur", (fe as any)._veBlurHandler)
+          ;(fe as any)._veBlurHandler = handleBlur
+          fe.addEventListener("blur", handleBlur)
         }
-
-        // Remove previous listener if any (avoid duplicates)
-        fe.removeEventListener("blur", (fe as any)._veBlurHandler)
-        ;(fe as any)._veBlurHandler = handleBlur
-        fe.addEventListener("blur", handleBlur)
       })
 
       editingBlockRef.current = blockId
+      showFloatingToolbar(el)
     },
-    [disableInlineEditing]
+    [disableInlineEditing, showFloatingToolbar]
   )
 
   // --- Drag and drop reordering ---
@@ -608,7 +787,11 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         if (!fieldEl) continue
 
         if (typeof value === "string") {
-          fieldEl.textContent = value
+          if (key === "body" || (typeof value === "string" && value.trim().startsWith("<"))) {
+            fieldEl.innerHTML = value
+          } else {
+            fieldEl.textContent = value
+          }
         } else if (
           value &&
           typeof value === "object" &&
@@ -695,8 +878,10 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
           })
           break
         case "SELECT_BLOCK":
-          selectBlock(data.blockId)
-          scrollToBlock(data.blockId)
+          if (selectedRef.current !== data.blockId) {
+            selectBlock(data.blockId)
+            scrollToBlock(data.blockId)
+          }
           enableInlineEditing(data.blockId)
           break
         case "HIGHLIGHT_BLOCK":
@@ -714,6 +899,9 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
         case "DISABLE_INLINE_EDITING":
           disableInlineEditing()
           break
+        case "INSERT_IMAGE_AT_CURSOR":
+          document.execCommand("insertImage", false, data.imageUrl)
+          break
       }
     }
 
@@ -729,13 +917,24 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
       ) as HTMLElement | null
       if (!blockEl) return
 
-      // If clicking inside a contentEditable field, let it behave normally
       const target = e.target as HTMLElement
+
+      // If clicking inside a contentEditable field, let it behave normally
       if (
         target.isContentEditable ||
         target.closest('[contenteditable="true"]')
       ) {
         return
+      }
+
+      // If clicking on a rich-text field (dashed outline, not contentEditable),
+      // let the field's own click handler fire (opens body editor drawer)
+      const fieldEl = target.closest("[data-field]") as HTMLElement | null
+      if (fieldEl && !fieldEl.isContentEditable) {
+        const fieldName = fieldEl.dataset.field || ""
+        if (fieldName === "body") {
+          return
+        }
       }
 
       e.preventDefault()
@@ -746,6 +945,20 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
       const blockName = blockEl.dataset.blockName || ""
 
       selectBlock(blockId)
+      enableInlineEditing(blockId)
+
+      // If the click was on a simple text field, focus it and place the cursor
+      const clickedField = target.closest("[data-field]") as HTMLElement | null
+      if (clickedField && clickedField.isContentEditable) {
+        clickedField.focus()
+        const range = document.createRange()
+        range.selectNodeContents(clickedField)
+        range.collapse(false)
+        const sel = window.getSelection()
+        sel?.removeAllRanges()
+        sel?.addRange(range)
+      }
+
       sendToParent({ type: "BLOCK_CLICKED", blockId, blockType, blockName })
     }
 
@@ -775,7 +988,7 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
       document.removeEventListener("mouseover", handleMouseOver)
       document.removeEventListener("mouseleave", handleMouseLeave)
     }
-  }, [selectBlock, highlightBlock, clearHighlight])
+  }, [selectBlock, enableInlineEditing, highlightBlock, clearHighlight])
 
   // Send ready signal on mount + setup drag/drop and insert handles
   useEffect(() => {
@@ -805,6 +1018,28 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
 
     document.addEventListener("click", handleLinkClick, true)
     return () => document.removeEventListener("click", handleLinkClick, true)
+  }, [])
+
+  // Reposition floating toolbar on scroll/resize
+  useEffect(() => {
+    const reposition = () => {
+      const toolbar = toolbarRef.current
+      if (!toolbar || !toolbar.classList.contains("ve-toolbar-visible")) return
+      if (!selectedRef.current) return
+      const el = getBlockById(selectedRef.current)
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      toolbar.style.top = `${Math.max(8, rect.top - 56)}px`
+      const toolbarWidth = toolbar.offsetWidth || 420
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - toolbarWidth - 8))
+      toolbar.style.left = `${left}px`
+    }
+    window.addEventListener("scroll", reposition, true)
+    window.addEventListener("resize", reposition)
+    return () => {
+      window.removeEventListener("scroll", reposition, true)
+      window.removeEventListener("resize", reposition)
+    }
   }, [])
 
   return null

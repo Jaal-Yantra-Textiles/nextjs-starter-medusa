@@ -99,6 +99,17 @@ export default async function Page({
       )
     }
 
+    if (body && typeof body === "string" && body.trim().startsWith("<")) {
+      return (
+        <section className="prose prose-neutral max-w-none">
+          {sectionTitle && (
+            <h2 className="mt-0 mb-6" {...titleProps}>{sectionTitle}</h2>
+          )}
+          <div {...fieldProps} dangerouslySetInnerHTML={{ __html: body }} />
+        </section>
+      )
+    }
+
     const text = typeof body === "string" ? body : ""
     return (
       <section className="prose prose-neutral max-w-none prose-p:mb-4 prose-headings:mb-6 prose-ul:mb-4 prose-ol:mb-4">
@@ -344,11 +355,12 @@ export default async function Page({
                 key={i}
                 className="rounded-lg border-l-4 border-ui-border-strong pl-6 py-4"
               >
-                {t.quote && (
-                  <p className="text-lg italic text-ui-fg-base mb-2">
-                    "{t.quote}"
-                  </p>
-                )}
+                <p
+                  className="text-lg italic text-ui-fg-base mb-2"
+                  {...(isVisualEditor ? { "data-field": `testimonials.${i}.quote` } : {})}
+                >
+                  "{t.quote || ""}"
+                </p>
                 <footer className="text-sm text-ui-fg-muted">
                   {t.avatar_url && (
                     <img
@@ -357,8 +369,14 @@ export default async function Page({
                       className="w-10 h-10 rounded-full inline-block mr-2 object-cover"
                     />
                   )}
-                  — {t.author || ""}
-                  {t.role && <span className="text-ui-fg-muted">, {t.role}</span>}
+                  <span {...(isVisualEditor ? { "data-field": `testimonials.${i}.author` } : {})}>
+                    — {t.author || ""}
+                  </span>
+                  {t.role && (
+                    <span {...(isVisualEditor ? { "data-field": `testimonials.${i}.role` } : {})} className="text-ui-fg-muted">
+                      , {t.role}
+                    </span>
+                  )}
                 </footer>
               </blockquote>
             ))}
@@ -626,7 +644,6 @@ export default async function Page({
                   ...(card.bg_color ? { backgroundColor: card.bg_color } : {}),
                   ...(card.text_color ? { color: card.text_color } : {}),
                 }}
-                {...(isVisualEditor ? { "data-field": `cards.${i}.title` } : {})}
               >
                 {card.image_url && (
                   <img
@@ -636,16 +653,25 @@ export default async function Page({
                   />
                 )}
                 {card.eyebrow && (
-                  <p className="text-xs font-semibold uppercase tracking-wider opacity-70">
+                  <p
+                    className="text-xs font-semibold uppercase tracking-wider opacity-70"
+                    {...(isVisualEditor ? { "data-field": `cards.${i}.eyebrow` } : {})}
+                  >
                     {card.eyebrow}
                   </p>
                 )}
-                {card.title && (
-                  <h3 className="text-lg font-semibold">{card.title}</h3>
-                )}
-                {card.description && (
-                  <p className="text-sm opacity-80 flex-1">{card.description}</p>
-                )}
+                <h3
+                  className="text-lg font-semibold"
+                  {...(isVisualEditor ? { "data-field": `cards.${i}.title` } : {})}
+                >
+                  {card.title || ""}
+                </h3>
+                <p
+                  className="text-sm opacity-80 flex-1"
+                  {...(isVisualEditor ? { "data-field": `cards.${i}.description` } : {})}
+                >
+                  {card.description || ""}
+                </p>
               </div>
             ))}
           </div>
@@ -717,6 +743,8 @@ export default async function Page({
           <div {...(isVisualEditor ? { "data-field": "body" } : {})}>
             <TipTapViewer doc={content.body} className="tiptap-content" />
           </div>
+        ) : content?.body && typeof content.body === "string" && content.body.trim().startsWith("<") ? (
+          <div {...(isVisualEditor ? { "data-field": "body" } : {})} dangerouslySetInnerHTML={{ __html: content.body }} />
         ) : content?.body && typeof content.body === "string" ? (
           <p
             className="text-sm text-ui-fg-subtle"
