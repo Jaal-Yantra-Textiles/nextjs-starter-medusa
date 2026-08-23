@@ -3,6 +3,7 @@ import { Metadata } from "next"
 import { getWebsitePage } from "@lib/data/website"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import TipTapViewer from "@modules/website/components/tiptap-viewer"
+import { buildBlockStyle, bentoSpanClass } from "@modules/website/components/block-style-helpers"
 
 import VisualEditorBridge from "@modules/website/components/visual-editor-bridge"
 
@@ -94,6 +95,17 @@ export default async function Page({
           <div {...fieldProps}>
             <TipTapViewer doc={body} className="tiptap-content" />
           </div>
+        </section>
+      )
+    }
+
+    if (body && typeof body === "string" && body.trim().startsWith("<")) {
+      return (
+        <section className="prose prose-neutral max-w-none">
+          {sectionTitle && (
+            <h2 className="mt-0 mb-6" {...titleProps}>{sectionTitle}</h2>
+          )}
+          <div {...fieldProps} dangerouslySetInnerHTML={{ __html: body }} />
         </section>
       )
     }
@@ -343,11 +355,12 @@ export default async function Page({
                 key={i}
                 className="rounded-lg border-l-4 border-ui-border-strong pl-6 py-4"
               >
-                {t.quote && (
-                  <p className="text-lg italic text-ui-fg-base mb-2">
-                    "{t.quote}"
-                  </p>
-                )}
+                <p
+                  className="text-lg italic text-ui-fg-base mb-2"
+                  {...(isVisualEditor ? { "data-field": `testimonials.${i}.quote` } : {})}
+                >
+                  "{t.quote || ""}"
+                </p>
                 <footer className="text-sm text-ui-fg-muted">
                   {t.avatar_url && (
                     <img
@@ -356,8 +369,14 @@ export default async function Page({
                       className="w-10 h-10 rounded-full inline-block mr-2 object-cover"
                     />
                   )}
-                  — {t.author || ""}
-                  {t.role && <span className="text-ui-fg-muted">, {t.role}</span>}
+                  <span {...(isVisualEditor ? { "data-field": `testimonials.${i}.author` } : {})}>
+                    — {t.author || ""}
+                  </span>
+                  {t.role && (
+                    <span {...(isVisualEditor ? { "data-field": `testimonials.${i}.role` } : {})} className="text-ui-fg-muted">
+                      , {t.role}
+                    </span>
+                  )}
                 </footer>
               </blockquote>
             ))}
@@ -492,6 +511,223 @@ export default async function Page({
     )
   }
 
+  const renderHeroWithImage = (content: any, isVisualEditor: boolean) => {
+    const layout = content?.layout || "image-right"
+    const imageUrl = content?.image_url || content?.image || ""
+    const buttons: Array<{ label?: string; href?: string; variant?: string }> = content?.buttons || []
+
+    const textSide = (
+      <div className="flex flex-col justify-center py-8 md:py-12">
+        {content?.eyebrow && (
+          <p
+            className="text-sm font-semibold text-ui-fg-muted uppercase tracking-wider mb-2"
+            {...(isVisualEditor ? { "data-field": "eyebrow" } : {})}
+          >
+            {content.eyebrow}
+          </p>
+        )}
+        {content?.title && (
+          <h1
+            className="text-3xl md:text-5xl font-semibold tracking-tight mb-4"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h1>
+        )}
+        {content?.subtitle && (
+          <p
+            className="text-base md:text-lg text-ui-fg-subtle mb-6 max-w-lg"
+            {...(isVisualEditor ? { "data-field": "subtitle" } : {})}
+          >
+            {content.subtitle}
+          </p>
+        )}
+        {buttons.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {buttons.map((btn, i) => (
+              <a
+                key={i}
+                href={btn.href || "#"}
+                className={`inline-flex items-center justify-center rounded-md px-6 py-3 text-sm font-medium transition-colors ${
+                  btn.variant === "secondary"
+                    ? "border border-ui-border-strong text-ui-fg-base hover:bg-ui-bg-subtle"
+                    : "bg-ui-fg-base text-ui-bg-base hover:bg-ui-fg-subtle"
+                }`}
+                {...(isVisualEditor ? { "data-field": `buttons.${i}.label` } : {})}
+              >
+                {btn.label || "Button"}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+
+    const imageSide = imageUrl ? (
+      <div className="flex-1 relative">
+        <img
+          src={imageUrl}
+          alt={content?.image_alt || ""}
+          className="w-full h-full object-cover rounded-lg"
+          {...(isVisualEditor ? { "data-field": "image_url" } : {})}
+        />
+      </div>
+    ) : (
+      <div
+        className="flex-1 rounded-lg bg-ui-bg-subtle border border-ui-border-base min-h-[300px] flex items-center justify-center"
+        {...(isVisualEditor ? { "data-field": "image_url" } : {})}
+      >
+        <span className="text-ui-fg-muted text-sm">No image</span>
+      </div>
+    )
+
+    return (
+      <section className="w-full">
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch`}>
+          {layout === "image-left" ? (
+            <>
+              {imageSide}
+              {textSide}
+            </>
+          ) : (
+            <>
+              {textSide}
+              {imageSide}
+            </>
+          )}
+        </div>
+      </section>
+    )
+  }
+
+  const renderBentoGrid = (content: any, isVisualEditor: boolean) => {
+    const cards: Array<{
+      eyebrow?: string
+      title?: string
+      description?: string
+      image_url?: string
+      col_span?: string
+      row_span?: string
+      bg_color?: string
+      text_color?: string
+    }> = content?.cards || []
+    const columns = content?.columns || "3"
+
+    return (
+      <section>
+        {content?.title && (
+          <h2
+            className="text-xl md:text-2xl font-semibold mb-4"
+            {...(isVisualEditor ? { "data-field": "title" } : {})}
+          >
+            {content.title}
+          </h2>
+        )}
+        {content?.subtitle && (
+          <p
+            className="text-sm text-ui-fg-subtle mb-6"
+            {...(isVisualEditor ? { "data-field": "subtitle" } : {})}
+          >
+            {content.subtitle}
+          </p>
+        )}
+        {cards.length > 0 ? (
+          <div
+            className={`grid gap-4 ${columns === "4" ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4" : columns === "2" ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"}`}
+            style={{ gridAutoRows: "minmax(160px, auto)" }}
+          >
+            {cards.map((card, i) => (
+              <div
+                key={i}
+                className={`rounded-xl border border-ui-border-base p-5 flex flex-col gap-2 ${bentoSpanClass(card.col_span, card.row_span)}`}
+                style={{
+                  ...(card.bg_color ? { backgroundColor: card.bg_color } : {}),
+                  ...(card.text_color ? { color: card.text_color } : {}),
+                }}
+              >
+                {card.image_url && (
+                  <img
+                    src={card.image_url}
+                    alt={card.title || ""}
+                    className="w-full h-32 object-cover rounded-md mb-2"
+                  />
+                )}
+                {card.eyebrow && (
+                  <p
+                    className="text-xs font-semibold uppercase tracking-wider opacity-70"
+                    {...(isVisualEditor ? { "data-field": `cards.${i}.eyebrow` } : {})}
+                  >
+                    {card.eyebrow}
+                  </p>
+                )}
+                <h3
+                  className="text-lg font-semibold"
+                  {...(isVisualEditor ? { "data-field": `cards.${i}.title` } : {})}
+                >
+                  {card.title || ""}
+                </h3>
+                <p
+                  className="text-sm opacity-80 flex-1"
+                  {...(isVisualEditor ? { "data-field": `cards.${i}.description` } : {})}
+                >
+                  {card.description || ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="text-center py-8 text-ui-fg-muted text-sm border-2 border-dashed border-ui-border-base rounded-lg"
+            data-field="cards"
+          >
+            No cards in bento grid
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  const renderButtonBlock = (content: any, isVisualEditor: boolean) => {
+    const buttons: Array<{
+      label?: string
+      href?: string
+      variant?: string
+      size?: string
+    }> = content?.buttons || []
+    const alignment = content?.align || "left"
+
+    return (
+      <section className={`flex flex-wrap gap-3 ${alignment === "center" ? "justify-center" : alignment === "right" ? "justify-end" : "justify-start"}`}>
+        {buttons.length > 0 ? (
+          buttons.map((btn, i) => (
+            <a
+              key={i}
+              href={btn.href || "#"}
+              className={`inline-flex items-center justify-center rounded-md font-medium transition-colors ${
+                btn.size === "large"
+                  ? "px-8 py-4 text-base"
+                  : btn.size === "small"
+                    ? "px-4 py-2 text-xs"
+                    : "px-6 py-3 text-sm"
+              } ${
+                btn.variant === "secondary"
+                  ? "border border-ui-border-strong text-ui-fg-base hover:bg-ui-bg-subtle"
+                  : btn.variant === "ghost"
+                    ? "text-ui-fg-base hover:bg-ui-bg-subtle"
+                    : "bg-ui-fg-base text-ui-bg-base hover:bg-ui-fg-subtle"
+              }`}
+              {...(isVisualEditor ? { "data-field": `buttons.${i}.label` } : {})}
+            >
+              {btn.label || "Button"}
+            </a>
+          ))
+        ) : (
+          <p className="text-ui-fg-muted text-sm">No buttons added</p>
+        )}
+      </section>
+    )
+  }
+
   const renderSection = (content: any) => {
     return (
       <section className="rounded-lg border border-ui-border-base p-6">
@@ -507,6 +743,8 @@ export default async function Page({
           <div {...(isVisualEditor ? { "data-field": "body" } : {})}>
             <TipTapViewer doc={content.body} className="tiptap-content" />
           </div>
+        ) : content?.body && typeof content.body === "string" && content.body.trim().startsWith("<") ? (
+          <div {...(isVisualEditor ? { "data-field": "body" } : {})} dangerouslySetInnerHTML={{ __html: content.body }} />
         ) : content?.body && typeof content.body === "string" ? (
           <p
             className="text-sm text-ui-fg-subtle"
@@ -571,6 +809,9 @@ export default async function Page({
           blocks.map((block, idx) => {
             const type = (block.type as string) || ""
             const rawContent = (block as any).content ?? {}
+            const rawSettings = (block as any).settings
+
+            const blockStyle = buildBlockStyle(rawSettings)
 
             const blockAttrs =
               isVisualEditor && block.id
@@ -591,7 +832,7 @@ export default async function Page({
                   align?: "left" | "center"
                 }
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderHero(
                       block.id,
                       content?.title ?? page.title,
@@ -601,69 +842,90 @@ export default async function Page({
                   </div>
                 )
               }
+              case "HeroWithImage": {
+                return (
+                  <div key={key} {...blockAttrs} style={blockStyle}>
+                    {renderHeroWithImage(rawContent, isVisualEditor)}
+                  </div>
+                )
+              }
+              case "BentoGrid": {
+                return (
+                  <div key={key} {...blockAttrs} style={blockStyle}>
+                    {renderBentoGrid(rawContent, isVisualEditor)}
+                  </div>
+                )
+              }
+              case "Button": {
+                return (
+                  <div key={key} {...blockAttrs} style={blockStyle}>
+                    {renderButtonBlock(rawContent, isVisualEditor)}
+                  </div>
+                )
+              }
               case "MainContent": {
                 const content = rawContent as {
                   body?: unknown
                   title?: string
                 }
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderMain(content?.body, content?.title, block.id)}
                   </div>
                 )
               }
               case "Header": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderHeader(rawContent)}
                   </div>
                 )
               }
               case "Footer": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderFooter(rawContent)}
                   </div>
                 )
               }
               case "Gallery": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderGallery(rawContent)}
                   </div>
                 )
               }
               case "Feature": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderFeature(rawContent)}
                   </div>
                 )
               }
               case "Testimonial": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderTestimonial(rawContent)}
                   </div>
                 )
               }
               case "Product": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderProduct(rawContent)}
                   </div>
                 )
               }
               case "ContactForm": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderContactForm(rawContent)}
                   </div>
                 )
               }
               case "Section": {
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderSection(rawContent)}
                   </div>
                 )
@@ -674,7 +936,7 @@ export default async function Page({
                   body?: unknown
                 }
                 return (
-                  <div key={key} {...blockAttrs}>
+                  <div key={key} {...blockAttrs} style={blockStyle}>
                     {renderMain(content?.body, content?.title, block.id)}
                   </div>
                 )
@@ -686,7 +948,7 @@ export default async function Page({
                   typeof c?.body !== "undefined"
                 ) {
                   return (
-                    <div key={key} {...blockAttrs}>
+                    <div key={key} {...blockAttrs} style={blockStyle}>
                       {renderMain(c.body, c.title, block.id)}
                     </div>
                   )
@@ -696,6 +958,7 @@ export default async function Page({
                     key={key}
                     className="p-4"
                     {...blockAttrs}
+                    style={blockStyle}
                   >
                     <h2 className="m-0">{block.name || block.type}</h2>
                     <pre className="text-sm text-ui-fg-subtle overflow-auto bg-ui-bg-subtle p-3 rounded mt-2">
