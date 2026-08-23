@@ -101,6 +101,14 @@ export type QuoteProducer = {
   is_verified: boolean
   /** The partner's own shop. Null when they have no verified/provisioned host. */
   url: string | null
+  /**
+   * The maker's own words (#1428). ⚠️ Sourced from the PRODUCT's artisan
+   * detail — neither the partner model nor `partner_onboarding_profile` carries
+   * prose, so a maker with no artisan detail has no story and this is null.
+   */
+  story: string | null
+  /** Scannable facts and the catalogue's own words. Facts only, never adjectives. */
+  tags: string[]
 }
 
 /** One labelled, public-safe fact about the maker. #1439 S9 */
@@ -150,6 +158,10 @@ export type QuoteViewLine = {
   quoted_subtotal: number | null
   unit_weight_grams: number | null
   weight_source: "variant" | "product" | null
+  /** The catalogue's own merchandising words. Empty, never null. */
+  product_tags?: string[]
+  product_type?: string | null
+  product_collection?: string | null
 }
 
 export type QuoteFreightOption = {
@@ -198,7 +210,61 @@ export type QuoteAcceptance = {
   balance_amount: number | null
 }
 
+/** One line of the reseller block (#1428 follow-up). */
+export type QuoteRetailLine = {
+  variant_id: string
+  product_title: string | null
+  quantity: number
+  /** What this buyer pays per unit. */
+  unit_amount: number
+  /** What the shop sells one at. Null when it could not be priced. */
+  list_unit_amount: number | null
+  /** Null unless there is a POSITIVE spread — never a zero presented as a fact. */
+  unit_margin: number | null
+  margin_pct: number | null
+}
+
+export type QuoteRetail = {
+  currency_code: string
+  lines: QuoteRetailLine[]
+  total_at_list: number | null
+  total_at_your_price: number
+  total_margin: number | null
+  margin_pct: number | null
+  tags: string[]
+}
+
+/** One gated reason to buy here (#1428 follow-up). Facts only. */
+export type QuoteAssurancePoint = {
+  key: "artisanal" | "verified" | "direct" | "held"
+  title: string
+  body: string
+}
+
+export type QuoteAssuranceCharge = {
+  key: string
+  label: string
+  /** Null when there is no amount to state — the note carries the fact. */
+  amount: number | null
+  note: string
+  /** False ⇒ the buyer pays this SEPARATELY. Render it so it cannot be missed. */
+  included: boolean
+}
+
+export type QuoteAssurance = {
+  maker_name: string | null
+  verified: boolean
+  points: QuoteAssurancePoint[]
+  charges: QuoteAssuranceCharge[]
+  currency_code: string
+  /** True ONLY when nothing beyond the shown total is payable. */
+  no_further_charges: boolean
+}
+
 export type QuoteView = {
+  assurance?: QuoteAssurance | null
+  /** What the same goods list at, and the spread. Null when there is none. */
+  retail?: QuoteRetail | null
   parties?: QuoteParties | null
   acceptance?: QuoteAcceptance | null
   lines: QuoteViewLine[]

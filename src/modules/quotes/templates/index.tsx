@@ -4,11 +4,12 @@ import { convertToLocale } from "@lib/util/money"
 
 import type { QuoteView } from "@lib/data/quotes"
 import QuoteAcceptPanel from "../components/quote-accept"
+import QuoteAssuranceSection from "../components/quote-assurance"
 import QuoteHowItWorks from "../components/quote-how-it-works"
 import QuoteLines from "../components/quote-lines"
 import QuotePartiesBlock from "../components/quote-parties"
-import QuoteProducerBand from "../components/quote-producer"
-import QuoteProvenanceSection from "../components/quote-provenance"
+import QuoteMakerSection from "../components/quote-producer"
+import QuoteRetailSection from "../components/quote-retail"
 import QuoteSummary from "../components/quote-summary"
 
 /**
@@ -33,7 +34,8 @@ const QuoteTemplate = ({
   token: string
   countryCode: string
 }) => {
-  const { compare, recipient, producer, provenance, parties, acceptance } = quote
+  const { compare, recipient, producer, provenance, parties, acceptance, retail, assurance } =
+    quote
 
   /**
    * The real split, so the guide's last step says the numbers rather than "a
@@ -84,10 +86,12 @@ const QuoteTemplate = ({
           before the numbers, not after them. */}
       <QuoteHowItWorks token={token} depositLine={depositLine} />
 
-      {/* Whose hands make this. Rendered only when the backend says so — on the
-          partner's own domain the partner IS the seller and naming them again
-          is noise, so `producer` is null there. */}
-      {producer ? <QuoteProducerBand producer={producer} /> : null}
+      {/* Whose hands make this, WITH their facts — one section rather than a
+          credit line at the top and a table of the same workshop's details
+          thirty lines below it. Renders whatever it has: the "Produced by"
+          framing needs a producer (null on the partner's own domain, where
+          naming them again is noise), the facts need only provenance. */}
+      <QuoteMakerSection producer={producer} provenance={provenance} />
 
       {/* Amber, and above the prices rather than below them: a buyer who scrolls
           no further still needs to know the clock is running. */}
@@ -121,10 +125,14 @@ const QuoteTemplate = ({
         />
       ) : null}
 
-      {/* Who made this, and how. Below the money because it is the reason to
-          say yes rather than part of the offer, and rendered only when the
-          backend has something true to say. */}
-      {provenance ? <QuoteProvenanceSection provenance={provenance} /> : null}
+      {/* What the same goods list at. Below the decision, because it is the
+          argument for reselling rather than part of the offer — and null
+          whenever there is no positive spread to report. */}
+      {/* Why here, and the full composition of the number. Below the decision:
+          it is the argument, not the offer. */}
+      {assurance ? <QuoteAssuranceSection assurance={assurance} /> : null}
+
+      {retail ? <QuoteRetailSection retail={retail} /> : null}
 
       {compare.disclaimer ? (
         <div className="mt-10 border-t border-ui-border-base pt-6">
