@@ -34,8 +34,16 @@ const QuoteTemplate = ({
   token: string
   countryCode: string
 }) => {
-  const { compare, recipient, producer, provenance, parties, acceptance, retail, assurance } =
-    quote
+  const {
+    compare,
+    recipient,
+    producer,
+    provenance,
+    parties,
+    acceptance,
+    retail,
+    assurance,
+  } = quote
 
   /**
    * The real split, so the guide's last step says the numbers rather than "a
@@ -43,12 +51,18 @@ const QuoteTemplate = ({
    * invents a percentage is worse than a generic sentence.
    */
   const depositLine =
-    acceptance?.deposit_amount !== null && acceptance?.deposit_amount !== undefined
-      ? `Accepting turns the quote into an order and takes you to checkout. You pay ${acceptance.deposit_pct}% now (${convertToLocale({ amount: acceptance.deposit_amount, currency_code: acceptance.currency_code })}) and the balance before dispatch.`
+    acceptance?.deposit_amount !== null &&
+    acceptance?.deposit_amount !== undefined
+      ? `Accepting turns the quote into an order and takes you to checkout. You pay ${
+          acceptance.deposit_pct
+        }% now (${convertToLocale({
+          amount: acceptance.deposit_amount,
+          currency_code: acceptance.currency_code,
+        })}) and the balance before dispatch.`
       : null
 
   return (
-    <div className="content-container py-12 max-w-4xl">
+    <div className="content-container py-12 max-w-4xl lg:max-w-6xl">
       <div className="flex flex-col gap-y-2">
         <Heading level="h1" className="text-2xl-semi text-ui-fg-base">
           {compare.headline}
@@ -56,86 +70,117 @@ const QuoteTemplate = ({
         <Text className="text-ui-fg-subtle">{compare.explanation}</Text>
       </div>
 
-      {/* Both parties and their registrations — the two questions finance asks
+      {/* Two columns from `lg` up: the DOCUMENT on the left, the decision
+          pinned on the right (#1439 S14).
+
+          🔑 The single-column order is preserved exactly, because it was
+          already right. The rail is the second grid child, so when the grid
+          collapses on a phone the panel lands where it always did — under the
+          totals, above the argument for buying. No `order` juggling, and
+          nothing to get wrong at a breakpoint nobody tests. */}
+      <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0">
+          {/* Both parties and their registrations — the two questions finance asks
           of any quote it is sent. Falls back to the recipient-only card for a
           quote minted before `parties` existed, rather than losing the
           "Prepared for" line entirely. */}
-      {parties ? (
-        <QuotePartiesBlock parties={parties} partnerNote={recipient.partner_note} />
-      ) : (recipient.name || recipient.company) ? (
-        <div className="mt-6 rounded-lg border border-ui-border-base p-5">
-          <Text className="txt-small-plus text-ui-fg-subtle uppercase tracking-wide">
-            Prepared for
-          </Text>
-          <Text className="txt-medium-plus text-ui-fg-base mt-1">
-            {recipient.company || recipient.name}
-          </Text>
-          {recipient.company && recipient.name ? (
-            <Text className="txt-small text-ui-fg-subtle">{recipient.name}</Text>
+          {parties ? (
+            <QuotePartiesBlock
+              parties={parties}
+              partnerNote={recipient.partner_note}
+            />
+          ) : recipient.name || recipient.company ? (
+            <div className="mt-6 rounded-lg border border-ui-border-base p-5">
+              <Text className="txt-small-plus text-ui-fg-subtle uppercase tracking-wide">
+                Prepared for
+              </Text>
+              <Text className="txt-medium-plus text-ui-fg-base mt-1">
+                {recipient.company || recipient.name}
+              </Text>
+              {recipient.company && recipient.name ? (
+                <Text className="txt-small text-ui-fg-subtle">
+                  {recipient.name}
+                </Text>
+              ) : null}
+              {recipient.partner_note ? (
+                <Text className="txt-medium text-ui-fg-subtle mt-3 whitespace-pre-line">
+                  {recipient.partner_note}
+                </Text>
+              ) : null}
+            </div>
           ) : null}
-          {recipient.partner_note ? (
-            <Text className="txt-medium text-ui-fg-subtle mt-3 whitespace-pre-line">
-              {recipient.partner_note}
-            </Text>
-          ) : null}
-        </div>
-      ) : null}
 
-      {/* Above the prices. Almost everyone who opens this link is opening their
+          {/* Above the prices. Almost everyone who opens this link is opening their
           first one, and the question "is this a bill?" has to be answered
           before the numbers, not after them. */}
-      <QuoteHowItWorks token={token} depositLine={depositLine} />
+          <QuoteHowItWorks token={token} depositLine={depositLine} />
 
-      {/* Whose hands make this, WITH their facts — one section rather than a
+          {/* Whose hands make this, WITH their facts — one section rather than a
           credit line at the top and a table of the same workshop's details
           thirty lines below it. Renders whatever it has: the "Produced by"
           framing needs a producer (null on the partner's own domain, where
           naming them again is noise), the facts need only provenance. */}
-      <QuoteMakerSection producer={producer} provenance={provenance} />
+          <QuoteMakerSection producer={producer} provenance={provenance} />
 
-      {/* Amber, and above the prices rather than below them: a buyer who scrolls
+          {/* Amber, and above the prices rather than below them: a buyer who scrolls
           no further still needs to know the clock is running. */}
-      {compare.expiry_notice ? (
-        <div className="mt-6 rounded-lg border border-ui-tag-orange-border bg-ui-tag-orange-bg p-4">
-          <Text className="txt-medium text-ui-tag-orange-text">
-            {compare.expiry_notice}
-          </Text>
-        </div>
-      ) : null}
+          {compare.expiry_notice ? (
+            <div className="mt-6 rounded-lg border border-ui-tag-orange-border bg-ui-tag-orange-bg p-4">
+              <Text className="txt-medium text-ui-tag-orange-text">
+                {compare.expiry_notice}
+              </Text>
+            </div>
+          ) : null}
 
-      <div className="mt-10">
-        <Heading level="h2" className="text-xl-semi text-ui-fg-base mb-2">
-          Your basket
-        </Heading>
-        {/* The buyer may move quantities here; every number that follows is
+          <div className="mt-10">
+            <Heading level="h2" className="text-xl-semi text-ui-fg-base mb-2">
+              Your basket
+            </Heading>
+            {/* The buyer may move quantities here; every number that follows is
             re-computed by the SERVER from what they dial (#1439 S13), which is
             why the control is two links and a URL rather than client state. */}
-        <QuoteLines quote={quote} token={token} countryCode={countryCode} />
-      </div>
+            <QuoteLines quote={quote} token={token} countryCode={countryCode} />
+          </div>
 
-      <div className="mt-10">
-        <QuoteSummary quote={quote} />
-      </div>
+          <div className="mt-10">
+            <QuoteSummary quote={quote} />
+          </div>
 
-      {/* Directly under the money, before the provenance story. A buyer who has
+          {/* Directly under the money, before the provenance story. A buyer who has
           just read the total is at the moment of deciding; making them scroll
           past the maker's history to find the button loses them. */}
-      {acceptance ? (
-        <QuoteAcceptPanel
-          token={token}
-          acceptance={acceptance}
-          countryCode={countryCode}
-          /* 🔴 The basket AS PRICED ABOVE, not the quoted one. `quote.lines`
+        </div>
+
+        {/* Sticky, so the total and the button stay in view while the buyer
+            scrolls the lines they are buying. `self-start` is what makes
+            `sticky` work in a grid — a stretched item is already as tall as the
+            row and has nothing to stick within.
+
+            🔴 `top-20`, not `top-8`. The storefront's own nav is `sticky top-0`
+            at 64px and `z-50`, so a rail pinned nearer the top slides UNDER it
+            and the panel's heading is clipped — which is exactly what happened,
+            and no assertion about the layout caught it. Found by looking at a
+            screenshot. 80px clears the nav with a 16px gap. */}
+        <aside className="lg:sticky lg:top-20 lg:self-start">
+          {acceptance ? (
+            <QuoteAcceptPanel
+              token={token}
+              acceptance={acceptance}
+              countryCode={countryCode}
+              /* 🔴 The basket AS PRICED ABOVE, not the quoted one. `quote.lines`
              already carries the buyer's dial — the backend re-priced the whole
              document through it — so handing these straight to the accept call
              is what stops a cart being built for quantities the buyer moved
              away from and never saw again. */
-          lines={quote.lines.map((l) => ({
-            variant_id: l.variant_id,
-            quantity: l.quantity,
-          }))}
-        />
-      ) : null}
+              lines={quote.lines.map((l) => ({
+                variant_id: l.variant_id,
+                quantity: l.quantity,
+              }))}
+              className="mt-10 lg:mt-0"
+            />
+          ) : null}
+        </aside>
+      </div>
 
       {/* What the same goods list at. Below the decision, because it is the
           argument for reselling rather than part of the offer — and null
@@ -148,7 +193,9 @@ const QuoteTemplate = ({
 
       {compare.disclaimer ? (
         <div className="mt-10 border-t border-ui-border-base pt-6">
-          <Text className="txt-small text-ui-fg-muted">{compare.disclaimer}</Text>
+          <Text className="txt-small text-ui-fg-muted">
+            {compare.disclaimer}
+          </Text>
         </div>
       ) : null}
     </div>
