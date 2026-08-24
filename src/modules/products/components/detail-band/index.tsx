@@ -85,6 +85,19 @@ const ProductDetailBand = async ({ product, theme }: Props) => {
       : []),
   ]
 
+  // A made-to-order choice is spec content too. Leaving it out is why a
+  // product with 57 colourways and an embroidery option counted as having
+  // "no spec" and rendered an empty band — the rule was right, what it
+  // measured was too narrow.
+  const optionRows = (spec?.options ?? []).map((o) => ({
+    key: `option-${o.key}`,
+    label: (o.label ?? o.key).trim(),
+    value: (o.values ?? []).map((v) => v.label).join(", "),
+    icon: "note",
+  }))
+
+  const colors = (spec?.colors ?? []).filter((c) => c.available !== false)
+
   const fieldRows = (spec?.fields ?? [])
     .filter((f) => (f.value ?? "").trim())
     .map((f) => ({
@@ -99,8 +112,9 @@ const ProductDetailBand = async ({ product, theme }: Props) => {
   // What this product can actually fill. Computed here, where the fetches are,
   // and handed to the pure rule — which stays free of them so it can be tested.
   const resolved = resolveDetailBand(band, {
-    spec: specRows.length > 0,
+    spec: specRows.length + optionRows.length > 0,
     spec_fields: fieldRows.length > 0,
+    colors: colors.length > 0,
     attributes: attributes.length > 0,
     maker: !!artisan?.maker_story?.trim(),
   })
@@ -112,9 +126,11 @@ const ProductDetailBand = async ({ product, theme }: Props) => {
   const renderBlock = (block: ResolvedDetailBlock) => {
     switch (block.source) {
       case "spec":
-        return <IconRows rows={specRows} />
+        return <IconRows rows={[...specRows, ...optionRows]} />
       case "spec_fields":
         return <IconRows rows={fieldRows} />
+      case "colors":
+        return <Swatches colors={colors} />
       case "attributes":
         return (
           <IconRows
@@ -153,6 +169,36 @@ const ProductDetailBand = async ({ product, theme }: Props) => {
     </div>
   )
 }
+
+/**
+ * The colourways, as colour rather than as a list of names.
+ *
+ * The name stays under each swatch: "Terracotta" and "Sienna" are two circles
+ * a shopper cannot tell apart, and a colour whose hex was never set has to
+ * render as its name alone rather than as an invisible gap.
+ */
+const Swatches = ({
+  colors,
+}: {
+  colors: Array<{ name: string; hex_code?: string | null }>
+}) => (
+  <ul className="flex flex-wrap gap-x-4 gap-y-3">
+    {colors.map((c) => (
+      <li key={c.name} className="flex flex-col items-center gap-y-1 w-16">
+        {c.hex_code && (
+          <span
+            aria-hidden="true"
+            className="size-8 rounded-full border border-ui-border-base"
+            style={{ backgroundColor: c.hex_code }}
+          />
+        )}
+        <span className="text-ui-fg-subtle text-xs text-center leading-tight">
+          {c.name}
+        </span>
+      </li>
+    ))}
+  </ul>
+)
 
 const IconRows = ({
   rows,
