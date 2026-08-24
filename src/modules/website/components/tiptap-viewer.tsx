@@ -53,6 +53,75 @@ function textAlignClass(attrs?: any): string {
   return ""
 }
 
+/**
+ * A provider URL in whatever shape it was written, as an EMBEDDABLE url.
+ *
+ * The editor's "Insert Video" flow already stores `youtube.com/embed/<id>`, so
+ * most documents arrive ready. This exists for the ones that do not: a partner
+ * who pastes a watch link into the text gets a link mark on a text node, and a
+ * link is all the viewer could ever have made of it.
+ *
+ * 🔑 `youtube-nocookie.com` rather than `youtube.com`. Same player, but it is
+ * the host content blockers and strict-privacy browser modes leave alone — an
+ * embed that renders for the author and is a blank 16:9 hole for a third of
+ * their visitors is worse than one that fails for everybody, because nobody
+ * reports it.
+ */
+export function toEmbedUrl(raw: string): string | null {
+  const trimmed = (raw || "").trim()
+  if (!trimmed) return null
+  let parsed: URL
+  try {
+    parsed = new URL(trimmed)
+  } catch {
+    return null
+  }
+  const host = parsed.hostname.replace(/^www\./, "")
+
+  if (host === "youtube-nocookie.com" || host === "youtube.com") {
+    const id = parsed.pathname.startsWith("/embed/")
+      ? parsed.pathname.slice("/embed/".length)
+      : parsed.searchParams.get("v")
+    if (!id) return null
+    return `https://www.youtube-nocookie.com/embed/${id}`
+  }
+  if (host === "youtu.be") {
+    const id = parsed.pathname.slice(1)
+    return id ? `https://www.youtube-nocookie.com/embed/${id}` : null
+  }
+  if (host === "player.vimeo.com") return trimmed
+  if (host === "vimeo.com") {
+    const id = parsed.pathname.split("/").filter(Boolean).pop()
+    return id ? `https://player.vimeo.com/video/${id}` : null
+  }
+  return null
+}
+
+function renderEmbed(rawSrc: string): string {
+  const src = toEmbedUrl(rawSrc) ?? rawSrc
+  if (!src) return ""
+  return `<div class="tiptap-video-wrapper relative my-4" style="padding-bottom: 56.25%; height: 0; overflow: hidden;"><iframe src="${escapeHtml(src)}" title="Embedded video" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;"></iframe></div>`
+}
+
+/**
+ * A paragraph that is NOTHING BUT a video link is a video the author meant to
+ * embed. Anything else — a link inside a sentence, two links in a row — stays
+ * a link, because promoting those would silently eat prose the author wrote.
+ */
+function paragraphAsEmbed(node: any): string | null {
+  const content = (node.content || []).filter(
+    (n: any) => !(n.type === "text" && !String(n.text || "").trim())
+  )
+  if (content.length !== 1) return null
+  const only = content[0]
+  if (only.type !== "text") return null
+  const href =
+    (only.marks || []).find((m: any) => m.type === "link")?.attrs?.href ||
+    String(only.text || "").trim()
+  const embed = toEmbedUrl(href)
+  return embed ? renderEmbed(embed) : null
+}
+
 function renderNode(node: any): string {
   if (!node) return ""
   if (node.type === "text") {
@@ -65,7 +134,10 @@ function renderNode(node: any): string {
       return `<h${level} class="mb-6 mt-8${textAlignClass(node.attrs)}">${children}</h${level}>`
     }
     case "paragraph":
-      return children ? `<p class="mb-4${textAlignClass(node.attrs)}">${children}</p>` : "<p></p>"
+      return (
+        paragraphAsEmbed(node) ??
+        (children ? `<p class="mb-4${textAlignClass(node.attrs)}">${children}</p>` : "<p></p>")
+      )
     case "bulletList":
       return `<ul class="mb-4 ml-6 list-disc">${children}</ul>`
     case "orderedList":
@@ -93,11 +165,8 @@ function renderNode(node: any): string {
     }
     case "youtube":
     case "vimeo":
-    case "embed": {
-      const src = escapeHtml(node.attrs?.src || "")
-      if (!src) return ""
-      return `<div class="tiptap-video-wrapper relative my-4" style="padding-bottom: 56.25%; height: 0; overflow: hidden;"><iframe src="${src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;"></iframe></div>`
-    }
+    case "embed":
+      return renderEmbed(node.attrs?.src || "")
     case "video": {
       const src = escapeHtml(node.attrs?.src || "")
       if (!src) return ""
@@ -108,7 +177,7 @@ function renderNode(node: any): string {
   }
 }
 
-function renderTipTapBody(doc: any): string {
+export function renderTipTapBody(doc: any): string {
   try {
     return (doc?.content || []).map(renderNode).join("")
   } catch {
