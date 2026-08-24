@@ -2,6 +2,8 @@
 
 import { useEffect, useCallback, useRef } from "react"
 
+import { renderTipTapBody } from "./tiptap-viewer"
+
 type BlockInfo = {
   id: string
   type: string
@@ -60,97 +62,15 @@ interface VisualEditorBridgeProps {
 
 const STYLE_ID = "ve-styles"
 
-function escapeHtml(s: string) {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;")
-}
-
-function textWithMarks(textNode: any): string {
-  const txt = escapeHtml(textNode.text || "")
-  const marks = textNode.marks || []
-  return marks.reduce((acc: string, m: any) => {
-    switch (m.type) {
-      case "bold": return `<strong>${acc}</strong>`
-      case "italic": return `<em>${acc}</em>`
-      case "strike": return `<s>${acc}</s>`
-      case "code": return `<code>${acc}</code>`
-      case "underline": return `<u>${acc}</u>`
-      case "link": {
-        const href = escapeHtml(m.attrs?.href || "")
-        const target = m.attrs?.target
-          ? ` target="${escapeHtml(m.attrs.target)}"`
-          : ""
-        const rel = ` rel="noopener noreferrer"`
-        return `<a href="${href}"${target}${rel}>${acc}</a>`
-      }
-      default: return acc
-    }
-  }, txt)
-}
-
-function textAlignClass(attrs?: any): string {
-  const align = attrs?.textAlign
-  if (align === "center") return " text-center"
-  if (align === "right") return " text-right"
-  if (align === "left") return " text-left"
-  return ""
-}
-
-function renderTipTapNode(node: any): string {
-  if (!node) return ""
-  if (node.type === "text") return textWithMarks(node)
-  const children = (node.content || []).map(renderTipTapNode).join("")
-  switch (node.type) {
-    case "heading": {
-      const level = Math.min(Math.max(node.attrs?.level || 2, 1), 6)
-      return `<h${level} class="mb-6 mt-8${textAlignClass(node.attrs)}">${children}</h${level}>`
-    }
-    case "paragraph": return children ? `<p class="mb-4${textAlignClass(node.attrs)}">${children}</p>` : "<p></p>"
-    case "bulletList": return `<ul class="mb-4 ml-6 list-disc">${children}</ul>`
-    case "orderedList": return `<ol class="mb-4 ml-6 list-decimal">${children}</ol>`
-    case "listItem": return `<li class="mb-2">${children}</li>`
-    case "blockquote": return `<blockquote class="border-l-4 border-ui-border-strong pl-4 italic my-4${textAlignClass(node.attrs)}">${children}</blockquote>`
-    case "codeBlock": {
-      const text = (node.content || [])
-        .filter((n: any) => n.type === "text")
-        .map((n: any) => escapeHtml(n.text || ""))
-        .join("")
-      return `<pre class="bg-ui-bg-subtle rounded-md p-4 overflow-x-auto"><code>${text}</code></pre>`
-    }
-    case "hardBreak": return "<br/>"
-    case "image": {
-      const src = escapeHtml(node.attrs?.src || "")
-      const alt = escapeHtml(node.attrs?.alt || "")
-      const cls = "tiptap-image max-w-full h-auto rounded-md"
-      return src ? `<img src="${src}" alt="${alt}" class="${cls}" />` : ""
-    }
-    case "youtube":
-    case "vimeo":
-    case "embed": {
-      const src = escapeHtml(node.attrs?.src || "")
-      if (!src) return ""
-      return `<div class="tiptap-video-wrapper relative my-4" style="padding-bottom: 56.25%; height: 0; overflow: hidden;"><iframe src="${src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="position:absolute;top:0;left:0;width:100%;height:100%;"></iframe></div>`
-    }
-    case "video": {
-      const src = escapeHtml(node.attrs?.src || "")
-      if (!src) return ""
-      return `<video controls class="w-full rounded-md my-4"><source src="${src}" /></video>`
-    }
-    default: return children
-  }
-}
-
-function renderTipTapToHtml(doc: any): string {
-  try {
-    return (doc?.content || []).map(renderTipTapNode).join("")
-  } catch {
-    return ""
-  }
-}
+/**
+ * 🔑 The TipTap renderer is IMPORTED, not repeated.
+ *
+ * This file used to carry a second, byte-identical copy of the JSON -> HTML
+ * walk. Two copies of a switch over node types is two places a node type has
+ * to be added to, and the forgotten one is the one the author is staring at
+ * while they edit — so a fix lands where nobody is watching. The live page and
+ * the visual editor now render from the same function by construction.
+ */
 
 function getBlockById(blockId: string): HTMLElement | null {
   return document.querySelector(`[data-block-id="${blockId}"]`)
@@ -798,7 +718,7 @@ export default function VisualEditorBridge({ blocks }: VisualEditorBridgeProps) 
           (value as any).type === "doc"
         ) {
           // TipTap JSON document — render to HTML
-          fieldEl.innerHTML = renderTipTapToHtml(value as any)
+          fieldEl.innerHTML = renderTipTapBody(value as any)
         } else if (Array.isArray(value)) {
           // Arrays (links, images, features, etc.) — too complex for inline DOM patching;
           // signal the parent to do a full iframe reload
