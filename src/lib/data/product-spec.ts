@@ -22,6 +22,8 @@ export type StoreSpecColor = {
   name: string
   hex_code?: string | null
   usage_notes?: string | null
+  /** The route returns this; the type had simply never listed it. */
+  available?: boolean
 }
 
 export type StoreSpecField = {

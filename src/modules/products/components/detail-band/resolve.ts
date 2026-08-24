@@ -17,6 +17,7 @@
 export type DetailBlockSource =
   | "spec"
   | "spec_fields"
+  | "colors"
   | "attributes"
   | "maker"
   | "care"
@@ -58,6 +59,7 @@ export type ResolvedDetailBand = {
 export const DEFAULT_BLOCK_LABELS: Record<DetailBlockSource, string> = {
   spec: "Made to",
   spec_fields: "Details",
+  colors: "Colours",
   attributes: "Product information",
   maker: "Made by",
   care: "Care",
