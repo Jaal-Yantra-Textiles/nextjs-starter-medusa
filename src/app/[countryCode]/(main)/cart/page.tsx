@@ -1,4 +1,4 @@
-import { retrieveCart } from "@lib/data/cart"
+import { retrieveCart, retrieveQuoteTerms } from "@lib/data/cart"
 import { retrieveCustomer } from "@lib/data/customer"
 import { getWebsite } from "@lib/data/website"
 import CartTemplate from "@modules/cart/templates"
@@ -33,9 +33,19 @@ export default async function Cart(props: Props) {
 
   if (!cart && !isThemeEditor) return notFound()
 
+  // #1787 — a quote cart must say so, and say what is due TODAY. Null for an
+  // ordinary cart, and null if the lookup fails: the plain total is always a
+  // correct thing to render.
+  const quoteTerms = cart ? await retrieveQuoteTerms(cart.id) : null
+
   return (
     <>
-      <CartTemplate cart={cart} customer={customer} theme={website?.theme} />
+      <CartTemplate
+        cart={cart}
+        customer={customer}
+        theme={website?.theme}
+        quoteTerms={quoteTerms}
+      />
       {isThemeEditor && <ThemeEditorBridge />}
     </>
   )
