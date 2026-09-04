@@ -6,15 +6,20 @@ import SignInPrompt from "../components/sign-in-prompt"
 import Divider from "@modules/common/components/divider"
 import { HttpTypes } from "@medusajs/types"
 import { WebsiteTheme } from "@lib/data/website"
+import QuoteCartNotice from "../components/quote-cart-notice"
+import type { QuoteCartTerms } from "types/quote-terms"
 
 const CartTemplate = ({
   cart,
   customer,
   theme,
+  quoteTerms,
 }: {
   cart: HttpTypes.StoreCart | null
   customer: HttpTypes.StoreCustomer | null
   theme?: WebsiteTheme | null
+  /** #1787 — null for an ordinary cart. */
+  quoteTerms?: QuoteCartTerms | null
 }) => {
   const cartTheme = theme?.cart
   const showSignIn = cartTheme?.show_sign_in_prompt !== false
@@ -28,6 +33,12 @@ const CartTemplate = ({
         {cart?.items?.length ? (
           <div className="grid grid-cols-1 small:grid-cols-[1fr_360px] gap-x-40">
             <div className="flex flex-col bg-white py-6 gap-y-6">
+              {/* Above everything else on purpose: "these prices are held, and
+                  this is what you pay today" is context for the whole basket,
+                  and a buyer who reaches the total without it has already
+                  formed an expectation. Not theme-gated — a payment term is
+                  not decoration a shop may switch off. */}
+              <QuoteCartNotice terms={quoteTerms ?? null} />
               {showFreeShippingBar && freeShippingThreshold && (
                 <FreeShippingBar
                   cart={cart}
