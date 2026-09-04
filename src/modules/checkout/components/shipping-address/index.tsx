@@ -3,7 +3,7 @@ import { Container } from "@medusajs/ui"
 import Checkbox from "@modules/common/components/checkbox"
 import Input from "@modules/common/components/input"
 import { mapKeys } from "lodash"
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import AddressSelect from "../address-select"
 import CountrySelect from "../country-select"
 
@@ -50,18 +50,28 @@ const ShippingAddress = ({
     email?: string
   ) => {
     address &&
-      setFormData((prevState: Record<string, any>) => ({
-        ...prevState,
-        "shipping_address.first_name": address?.first_name || "",
-        "shipping_address.last_name": address?.last_name || "",
-        "shipping_address.address_1": address?.address_1 || "",
-        "shipping_address.company": address?.company || "",
-        "shipping_address.postal_code": address?.postal_code || "",
-        "shipping_address.city": address?.city || "",
-        "shipping_address.country_code": address?.country_code || "",
-        "shipping_address.province": address?.province || "",
-        "shipping_address.phone": address?.phone || "",
-      }))
+      setFormData((prevState: Record<string, any>) => {
+        // Keep what is already in the field when the cart has nothing for it.
+        // `|| ""` here is what turned a null-valued address row into a form
+        // wipe; an absent value must leave the buyer's own input alone.
+        const keep = (incoming: unknown, key: string) =>
+          incoming === null || incoming === undefined || incoming === ""
+            ? prevState[key] ?? ""
+            : incoming
+
+        return {
+          ...prevState,
+          "shipping_address.first_name": keep(address?.first_name, "shipping_address.first_name"),
+          "shipping_address.last_name": keep(address?.last_name, "shipping_address.last_name"),
+          "shipping_address.address_1": keep(address?.address_1, "shipping_address.address_1"),
+          "shipping_address.company": keep(address?.company, "shipping_address.company"),
+          "shipping_address.postal_code": keep(address?.postal_code, "shipping_address.postal_code"),
+          "shipping_address.city": keep(address?.city, "shipping_address.city"),
+          "shipping_address.country_code": keep(address?.country_code, "shipping_address.country_code"),
+          "shipping_address.province": keep(address?.province, "shipping_address.province"),
+          "shipping_address.phone": keep(address?.phone, "shipping_address.phone"),
+        }
+      })
 
     email &&
       setFormData((prevState: Record<string, any>) => ({
@@ -70,7 +80,35 @@ const ShippingAddress = ({
       }))
   }
 
+  /**
+   * 🔴 Seed the form from the cart ONCE, and never again after the buyer starts
+   * typing (#1787).
+   *
+   * This used to run on every new `cart` object and overwrite EVERY field from
+   * `cart.shipping_address`. On an ordinary storefront cart that is harmless —
+   * there is no shipping address until the buyer submits one, so the guard
+   * below is false and the effect never fires.
+   *
+   * A quote-accepted cart is different: `acceptQuoteWorkflow` creates the
+   * address row up front carrying only `country_code`, with name, street, city
+   * and postcode all null. So the guard passes, every field is reset to "", and
+   * because the checkout refetches the cart while the buyer is on the page, the
+   * reset lands mid-typing. The buyer sees an input that "won't let me write" —
+   * the characters go in and vanish. Reported from production by a buyer who
+   * could not get past the delivery step.
+   *
+   * Two defences, because either alone still loses characters:
+   *   - `hasEdited` stops the sync the moment the buyer touches the form;
+   *   - the merge below only takes values that are actually present, so a null
+   *     from the cart can never blank a field the buyer has filled.
+   */
+  const hasEdited = useRef(false)
+
   useEffect(() => {
+    if (hasEdited.current) {
+      return
+    }
+
     // Ensure cart is not null and has a shipping_address before setting form data
     if (cart && cart.shipping_address) {
       setFormAddress(cart?.shipping_address, cart?.email)
@@ -79,13 +117,15 @@ const ShippingAddress = ({
     if (cart && !cart.email && customer?.email) {
       setFormAddress(undefined, customer.email)
     }
-  }, [cart]) // Add cart as a dependency
+  }, [cart, customer?.email])
 
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLInputElement | HTMLSelectElement
     >
   ) => {
+    // From here on the buyer owns the form; the cart must not write over it.
+    hasEdited.current = true
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
