@@ -54,11 +54,44 @@ export async function GET(
   let checkoutCountry = countryCode
 
   try {
-    const cart = await retrieveCart(cartId, "id,region.countries.iso_2")
-    const cartCountry = (cart as any)?.region?.countries?.[0]?.iso_2?.toLowerCase()
+    const cart = await retrieveCart(
+      cartId,
+      "id,shipping_address.country_code,region.countries.iso_2"
+    )
 
-    if (cartCountry && cartCountry !== countryCode) {
+    const regionCountries = ((cart as any)?.region?.countries ?? [])
+      .map((c: { iso_2?: string | null }) =>
+        String(c?.iso_2 ?? "").trim().toLowerCase()
+      )
+      .filter(Boolean)
+
+    const cartCountry = String(
+      (cart as any)?.shipping_address?.country_code ?? ""
+    )
+      .trim()
+      .toLowerCase()
+
+    const urlCountry = String(countryCode ?? "").trim().toLowerCase()
+
+    /**
+     * 🔴 This used to read `region.countries[0]` — the region's FIRST country,
+     * in whatever order the API returned it — and override the URL with it. A
+     * Swedish buyer on a correct `/se/` link was sent to `/al/` (Albania).
+     * Seeding Albania into a local region and still getting Austria is the
+     * tell: the country is not "alphabetically first", it is ARBITRARY.
+     */
+    if (cartCountry && regionCountries.includes(cartCountry)) {
       checkoutCountry = cartCountry
+    } else if (urlCountry && regionCountries.includes(urlCountry)) {
+      // The link named a country this region serves. It is the only real
+      // signal about the buyer, and overriding it is what broke /se/.
+      checkoutCountry = urlCountry
+    } else if (regionCountries.length === 1) {
+      checkoutCountry = regionCountries[0]
+    } else if (regionCountries.length > 1) {
+      // ⚠️ LAST RESORT and a genuine guess — nothing here knows where the
+      // buyer is. The real fix is the country being set when the cart is made.
+      checkoutCountry = regionCountries[0]
     }
   } catch {
     // keep countryCode

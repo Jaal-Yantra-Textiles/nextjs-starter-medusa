@@ -114,9 +114,15 @@ export default function CheckoutShippingSection({
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [regions])
 
-  const selectedCountryOption =
-    countryOptions.find((o) => o.country === currentCountry) ??
-    countryOptions[0]
+  /**
+   * 🔴 NO `?? countryOptions[0]` fallback. That list is every country of every
+   * region sorted by name, so an unmatched country was announced as the
+   * alphabetically-first country on the platform — a Swedish buyer was shown
+   * "Angola", selected. Undefined is truthful and the trigger renders "—".
+   */
+  const selectedCountryOption = countryOptions.find(
+    (o) => o.country === currentCountry
+  )
 
   const handleRegionChange = (countryCode: string) => {
     const option = countryOptions.find((opt) => opt.country === countryCode)
@@ -288,7 +294,12 @@ export default function CheckoutShippingSection({
 
               const priceAmount =
                 option.price_type === "flat"
-                  ? option.amount!
+                  ? // 🔴 `option.amount!` is a TS assertion and does NOTHING at
+                    // runtime. A flat option has no amount when it has no price
+                    // in the cart's currency; `undefined` then passed the
+                    // `!== null` guard below and reached Intl.NumberFormat,
+                    // rendering "€NaN". `??` not `||`: an amount of 0 is FREE.
+                    option.amount ?? null
                   : calculatedPricesMap[option.id] !== undefined
                     ? calculatedPricesMap[option.id]
                     : null
@@ -315,12 +326,17 @@ export default function CheckoutShippingSection({
                   )}
                   data-testid="delivery-option-radio"
                 >
+                  {/* An option with no price in this currency cannot be
+                      chosen. It used to be selectable while showing "€NaN". */}
                   <RadioGroup.Item
                     value={option.id}
                     aria-label={option.name}
+                    disabled={priceAmount === null && !isLoadingPrices}
                     className="absolute inset-0 z-10 h-full w-full cursor-pointer rounded-md bg-transparent outline-none [&>div]:hidden focus-visible:shadow-borders-interactive-with-focus"
                   />
-                  <span className="txt-compact-medium-plus text-ui-fg-base">
+                  {/* Fixed `w-[180px]` card; a ULID in the name is one
+                      unbreakable token and rendered outside the box. */}
+                  <span className="txt-compact-medium-plus text-ui-fg-base break-words">
                     {option.name}
                   </span>
                   <div className="flex flex-col gap-y-0">
