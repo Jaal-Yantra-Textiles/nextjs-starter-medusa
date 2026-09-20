@@ -19,20 +19,47 @@ type DiscountCodeProps = {
 const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
   const [isOpen, setIsOpen] = React.useState(false)
   const [errorMessage, setErrorMessage] = React.useState("")
+  const [isBusy, setIsBusy] = React.useState(false)
 
   const { promotions = [] } = cart
+
+  /**
+   * 🔑 This file deliberately does NOT carry the `router.refresh()` that its
+   * `apps/storefront` twin needs.
+   *
+   * There, the handlers POST to a route handler, so `revalidateTag` invalidates
+   * the server cache and nothing pushes a new render to the client — the panel
+   * kept showing the pre-mutation total, off by the whole discount, in both
+   * directions (#2194). Here the form submits through a SERVER ACTION and
+   * `applyPromotions` is called directly, so the revalidation re-renders the
+   * route on its own. Adding a refresh would be cargo-cult.
+   *
+   * What this file DID share with it: a rejected code was wiped from the field,
+   * nothing was disabled mid-request, and a failed REMOVE threw unhandled.
+   */
   const removePromotionCode = async (code: string) => {
     const validPromotions = promotions.filter(
       (promotion) => promotion.code !== code
     )
 
-    await applyPromotions(
-      validPromotions.filter((p) => p.code !== undefined).map((p) => p.code!)
-    )
+    setErrorMessage("")
+    setIsBusy(true)
+    try {
+      await applyPromotions(
+        validPromotions.filter((p) => p.code !== undefined).map((p) => p.code!)
+      )
+    } catch (e: any) {
+      setErrorMessage(e?.message || "Failed to remove the promotion code")
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   const addPromotionCode = async (formData: FormData) => {
     setErrorMessage("")
+    if (isBusy) {
+      return
+    }
 
     const code = formData.get("code")
     if (!code) {
@@ -44,14 +71,21 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
       .map((p) => p.code!)
     codes.push(code.toString())
 
+    setIsBusy(true)
     try {
       await applyPromotions(codes)
+      /**
+       * Only on SUCCESS. Clearing unconditionally wiped a REJECTED code and
+       * left the error with nothing beside it, so a refusal looked the same
+       * as an acceptance.
+       */
+      if (input) {
+        input.value = ""
+      }
     } catch (e: any) {
-      setErrorMessage(e.message)
-    }
-
-    if (input) {
-      input.value = ""
+      setErrorMessage(e?.message || "Failed to apply the promotion code")
+    } finally {
+      setIsBusy(false)
     }
   }
 
@@ -83,6 +117,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
                   name="code"
                   type="text"
                   autoFocus={false}
+                  disabled={isBusy}
                   data-testid="discount-input"
                 />
                 <SubmitButton
@@ -157,6 +192,7 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
 
                           removePromotionCode(promotion.code)
                         }}
+                        disabled={isBusy}
                         data-testid="remove-discount-button"
                       >
                         <Trash size={14} />
