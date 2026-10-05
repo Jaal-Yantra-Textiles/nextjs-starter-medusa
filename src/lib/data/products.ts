@@ -7,6 +7,25 @@ import { SortOptions } from "@modules/store/components/refinement-list/sort-prod
 import { getAuthHeaders, getCacheOptions } from "./cookies"
 import { getRegion, retrieveRegion } from "./regions"
 
+/**
+ * How long a cached product response may stay stale, in seconds.
+ *
+ * 🔴 Product fetches were `force-cache` with only a per-visitor tag, and
+ * nothing ever revalidates the "products" tag — so the FIRST response for a
+ * URL was served for the life of the data cache. On 2026-10-05 gof.asia was
+ * still rendering its 8 Sep snapshot: the 100s/150S muslin at 0 stock (the
+ * backend said 10) and none of the 12 m packs added that morning. A customer
+ * was told "out of stock" for cloth that was on the shelf.
+ *
+ * Stock and price are the two things a product page must not get wrong, so
+ * this TTL is short. Same shape as WEBSITE_CACHE_TTL_SECONDS: tune with
+ * PRODUCT_CACHE_TTL_SECONDS; 0 disables caching.
+ */
+const PRODUCT_CACHE_TTL_SECONDS = Number.parseInt(
+  process.env.PRODUCT_CACHE_TTL_SECONDS ?? "60",
+  10
+)
+
 export const listProducts = async ({
   pageParam = 1,
   queryParams,
@@ -49,8 +68,13 @@ export const listProducts = async ({
     ...(await getAuthHeaders()),
   }
 
-  const next = {
+  const next: Record<string, unknown> = {
     ...(await getCacheOptions("products")),
+  }
+  const productTtl =
+    Number.isFinite(PRODUCT_CACHE_TTL_SECONDS) && PRODUCT_CACHE_TTL_SECONDS > 0
+  if (productTtl) {
+    next.revalidate = PRODUCT_CACHE_TTL_SECONDS
   }
 
   return sdk.client
@@ -68,7 +92,8 @@ export const listProducts = async ({
         },
         headers,
         next,
-        cache: "force-cache",
+        // `no-store` when the TTL is disabled — never force-cache with no expiry.
+        cache: productTtl ? "force-cache" : "no-store",
       }
     )
     .then(({ products, count }) => {
