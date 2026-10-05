@@ -3,18 +3,19 @@
 import { sdk } from "@lib/config"
 import { HttpTypes } from "@medusajs/types"
 import { getCacheOptions } from "./cookies"
+import { catalogCacheMode, withCatalogTtl } from "@lib/util/catalog-cache"
 
 export const retrieveCollection = async (id: string) => {
-  const next = {
+  const next = withCatalogTtl({
     ...(await getCacheOptions("collections")),
-  }
+  })
 
   return sdk.client
     .fetch<{ collection: HttpTypes.StoreCollection }>(
       `/store/collections/${id}`,
       {
         next,
-        cache: "force-cache",
+        cache: catalogCacheMode(),
       }
     )
     .then(({ collection }) => collection)
@@ -23,9 +24,9 @@ export const retrieveCollection = async (id: string) => {
 export const listCollections = async (
   queryParams: Record<string, string> = {}
 ): Promise<{ collections: HttpTypes.StoreCollection[]; count: number }> => {
-  const next = {
+  const next = withCatalogTtl({
     ...(await getCacheOptions("collections")),
-  }
+  })
 
   return sdk.client
     .fetch<{ collections: HttpTypes.StoreCollection[]; count: number }>(
@@ -33,7 +34,7 @@ export const listCollections = async (
       {
         query: { limit: 100, ...queryParams },
         next,
-        cache: "force-cache",
+        cache: catalogCacheMode(),
       }
     )
     .then(({ collections, count }) => ({ collections, count }))
@@ -42,15 +43,15 @@ export const listCollections = async (
 export const getCollectionByHandle = async (
   handle: string
 ): Promise<HttpTypes.StoreCollection> => {
-  const next = {
+  const next = withCatalogTtl({
     ...(await getCacheOptions("collections")),
-  }
+  })
 
   return sdk.client
     .fetch<{ collections: HttpTypes.StoreCollection[] }>(`/store/collections`, {
       query: { handle },
       next,
-      cache: "force-cache",
+      cache: catalogCacheMode(),
     })
     .then(({ collections }) => collections[0])
 }

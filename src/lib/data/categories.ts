@@ -1,11 +1,12 @@
 import { sdk } from "@lib/config"
 import { HttpTypes } from "@medusajs/types"
 import { getCacheOptions } from "./cookies"
+import { catalogCacheMode, withCatalogTtl } from "@lib/util/catalog-cache"
 
 export const listCategories = async (query?: Record<string, any>) => {
-  const next = {
+  const next = withCatalogTtl({
     ...(await getCacheOptions("categories")),
-  }
+  })
 
   return sdk.client
     .fetch<{ product_categories: HttpTypes.StoreProductCategory[] }>(
@@ -13,7 +14,7 @@ export const listCategories = async (query?: Record<string, any>) => {
       {
         query: { limit: 100, ...query },
         next,
-        cache: "force-cache",
+        cache: catalogCacheMode(),
       }
     )
     .then(({ product_categories }) => product_categories)
@@ -22,9 +23,9 @@ export const listCategories = async (query?: Record<string, any>) => {
 export const getCategoryByHandle = async (categoryHandle: string[]) => {
   const handle = `${categoryHandle.join("/")}`
 
-  const next = {
+  const next = withCatalogTtl({
     ...(await getCacheOptions("categories")),
-  }
+  })
 
   return sdk.client
     .fetch<{ product_categories: HttpTypes.StoreProductCategory[] }>(
@@ -32,7 +33,7 @@ export const getCategoryByHandle = async (categoryHandle: string[]) => {
       {
         query: { handle },
         next,
-        cache: "force-cache",
+        cache: catalogCacheMode(),
       }
     )
     .then(({ product_categories }) => product_categories[0])
