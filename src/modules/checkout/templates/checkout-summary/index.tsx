@@ -1,4 +1,7 @@
+import { isManual } from "@lib/constants"
+import { listCartShippingMethods } from "@lib/data/fulfillment"
 import { listCartPaymentMethods } from "@lib/data/payment"
+import { isPickupShippingOption } from "@lib/util/fulfillment"
 import type { HttpTypes } from "@medusajs/types"
 import DiscountCode from "@modules/checkout/components/discount-code"
 import CheckoutPaymentSection from "@modules/checkout/components/checkout-payment-section"
@@ -14,7 +17,28 @@ const CheckoutSummary = async ({
   /** #1787 — null for an ordinary cart. */
   quoteTerms?: QuoteCartTerms | null
 }) => {
-  const paymentMethods = await listCartPaymentMethods(cart.region?.id ?? "")
+  const [paymentMethods, shippingOptions] = await Promise.all([
+    listCartPaymentMethods(cart.region?.id ?? ""),
+    listCartShippingMethods(cart.id),
+  ])
+
+  /**
+   * Cash (the manual provider) is for a buyer standing at our counter: it is
+   * offered only once the cart's delivery is an in-person PICKUP. On a shipped
+   * order nobody is there to take the cash, so the region may carry the
+   * provider without every shipped cart being offered it.
+   */
+  const pickupOptionIds = new Set(
+    (shippingOptions ?? [])
+      .filter((o) => isPickupShippingOption(o as any))
+      .map((o) => o.id)
+  )
+  const isPickup = !!cart.shipping_methods?.some(
+    (m) => !!m.shipping_option_id && pickupOptionIds.has(m.shipping_option_id)
+  )
+  const offeredPaymentMethods = (paymentMethods ?? []).filter(
+    (m) => !isManual(m.id) || isPickup
+  )
 
   return (
     <div className="flex flex-col gap-y-8 px-4 py-4 lg:py-10 lg:ps-10 bg-neutral-100 lg:-me-[9999px] lg:pe-[9999px]">
@@ -28,7 +52,7 @@ const CheckoutSummary = async ({
 
       <CheckoutPaymentSection
         cart={cart}
-        availablePaymentMethods={paymentMethods ?? []}
+        availablePaymentMethods={offeredPaymentMethods}
       />
     </div>
   )

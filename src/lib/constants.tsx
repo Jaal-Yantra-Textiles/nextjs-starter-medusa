@@ -43,7 +43,8 @@ export const paymentInfoMap: Record<
     icon: <PayPal />,
   },
   pp_system_default: {
-    title: "Manual Payment",
+    // Only ever offered on an in-person pickup (see checkout-summary).
+    title: "Pay in cash at pickup",
     icon: <CreditCard />,
   },
   pp_payu_payu: {
