@@ -99,12 +99,25 @@ const Shipping: React.FC<ShippingProps> = ({
     return dupes
   }, [availableShippingMethods])
 
+  /**
+   * A FLAT option with no price for this cart comes back with `amount: null` —
+   * e.g. a free-shipping row gated on `item_total >= 340` when the basket is
+   * under 340. The backend refuses it ("do not have a price"), so offering it
+   * only lets the buyer pick an error. `0` is a real price (free), not missing.
+   */
+  const isUnpricedFlat = (sm: HttpTypes.StoreCartShippingOption) =>
+    sm.price_type === "flat" && typeof sm.amount !== "number"
+
   const _shippingMethods = availableShippingMethods?.filter(
-    (sm) => sm.service_zone?.fulfillment_set?.type !== "pickup"
+    (sm) =>
+      sm.service_zone?.fulfillment_set?.type !== "pickup" &&
+      !isUnpricedFlat(sm)
   )
 
   const _pickupMethods = availableShippingMethods?.filter(
-    (sm) => sm.service_zone?.fulfillment_set?.type === "pickup"
+    (sm) =>
+      sm.service_zone?.fulfillment_set?.type === "pickup" &&
+      !isUnpricedFlat(sm)
   )
 
   const hasPickupOptions = !!_pickupMethods?.length
