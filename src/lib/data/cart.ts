@@ -43,13 +43,30 @@ export async function retrieveCart(cartId?: string, fields?: string) {
     .fetch<HttpTypes.StoreCartResponse>(`/store/carts/${id}`, {
       method: "GET",
       query: {
-        fields,
+        // `+`, not a plain field: a plain name would replace the defaults.
+        fields: `${fields},+completed_at`,
       },
       headers,
       next,
       cache: "force-cache",
     })
-    .then(({ cart }: { cart: HttpTypes.StoreCart }) => cart)
+    /**
+     * 🔴 A completed cart is an ORDER now, not a cart — report "no cart".
+     *
+     * The store API still returns a cart after checkout, and the cookie can
+     * outlive it: the abandoned-cart link (`/checkout/cart/[cartId]`) writes the
+     * cookie for 7 days, and a cart the ADMIN completes never runs this
+     * browser's `placeOrder` → `removeCartId()`. On the main store (order #149,
+     * 2026-10-28) the buyer came back to the paid item still in the bag, and
+     * every remove 500'd with "Cart … is already completed".
+     *
+     * Null shows an empty bag; the next add-to-cart creates a new cart and
+     * overwrites the stale cookie (`getOrSetCart`). Same fix as the main
+     * storefront's fork (apps/storefront, v2 #2489).
+     */
+    .then(({ cart }: { cart: HttpTypes.StoreCart }) =>
+      cart?.completed_at ? null : cart
+    )
     .catch(() => null)
 }
 
