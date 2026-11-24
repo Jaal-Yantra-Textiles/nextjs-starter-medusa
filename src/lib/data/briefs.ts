@@ -19,9 +19,29 @@ export type BriefChoiceEstimate = {
   stale: boolean
 }
 
+/** Public profile facts (#2444); empty unless the workshop made its profile public. */
+export type BriefWorkshop = {
+  id: string
+  name: string
+  handle: string | null
+  /** Their page on our main storefront. */
+  profile_url: string | null
+  /** Their own shop, when they have one. */
+  store_url: string | null
+  tagline?: string | null
+  about?: string | null
+  cover_image?: string | null
+  logo?: string | null
+  team_size?: number | null
+  roles: { role: string; count: number }[]
+  pieces_made?: number
+  making_since?: string | null
+  photos: string[]
+}
+
 export type BriefChoice = {
   id: string
-  partner: { id: string; name: string; handle: string | null }
+  partner: BriefWorkshop
   note: string | null
   estimate: BriefChoiceEstimate | null
   samples: { id: string; title: string; material: string | null; photos: string[] }[]
@@ -34,6 +54,7 @@ export type BriefStep = {
   technique: string | null
   technique_label: string | null
   qty_per_piece: number | null
+  lead_days: number | null
   note: string | null
   selected_choice_id: string | null
   state: "estimated" | "ask" | "exploring"
@@ -69,6 +90,18 @@ export type BriefOption = {
   steps: BriefStep[]
   estimate: BriefOptionEstimate
   story: BriefOptionStory
+  timeline: BriefTimeline
+}
+
+export type BriefTimeline = {
+  sample_days: number | null
+  production_low: number | null
+  production_high: number | null
+  unknown_steps: string[]
+  ready_low: string | null
+  ready_high: string | null
+  deadline: string | null
+  verdict: "on_track" | "tight" | "too_soon" | "unknown" | null
 }
 
 export type BriefFile = { url: string; name: string; type: string; size: number; uploaded_at: string }
@@ -112,6 +145,7 @@ export type BriefView = {
   currency_code: string
   fx: BriefFx
   sample_quantity: number | null
+  sample_days: number | null
   submitted_at: string | null
   expires_at: string | null
   estimate_disclaimer: string

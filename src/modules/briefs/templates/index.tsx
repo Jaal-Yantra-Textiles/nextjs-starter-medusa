@@ -27,6 +27,8 @@ const money = (amount: number, currency: string) => convertToLocale({ amount, cu
 const range = (low: number, high: number, currency: string) =>
   low === high ? money(low, currency) : `${money(low, currency)} – ${money(high, currency)}`
 
+type LinkCtx = { token: string; countryCode: string }
+
 type Screen = "welcome" | "style" | "workshops" | "details" | "review" | "status"
 const STEPS: { key: Screen; label: string }[] = [
   { key: "style", label: "Style" },
@@ -168,7 +170,8 @@ export default function BriefTemplate({
                     <StepPicker key={s.id} index={i} step={s} editable={editable && !pending} onPick={pickChoice} />
                   ))}
                 </ol>
-                <StoryBox option={o} />
+                <StoryBox option={o} link={{ token, countryCode }} />
+                <TimelineBox option={o} />
                 <EstimateBox option={o} compact fxLine={fxLine} />
               </>
             )}
@@ -199,7 +202,7 @@ export default function BriefTemplate({
         <Panel title="Check and send" lead="Here's what we'll take to the workshops.">
           <Banner tone="estimate">{brief.estimate_disclaimer}</Banner>
           {fxLine && <Text className="text-small-regular text-ui-fg-muted -mt-2">{fxLine}</Text>}
-          <Summary brief={brief} chosen={chosen} fxLine={fxLine} />
+          <Summary brief={brief} chosen={chosen} link={{ token, countryCode }} fxLine={fxLine} />
           <Nav
             pending={pending}
             back={() => go("details")}
@@ -214,6 +217,7 @@ export default function BriefTemplate({
           brief={brief}
           chosen={chosen}
           onEdit={editable ? () => go("style") : null}
+          link={{ token, countryCode }}
         />
       )}
 
@@ -381,52 +385,169 @@ function StepPicker({
         </div>
       ) : (
         <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {step.choices.map((c) => {
-            const picked = step.selected_choice_id === c.id
-            const choosable = editable && step.choices.length > 1
-            const photos = c.samples.flatMap((s) => s.photos).slice(0, 3)
-            return (
-              <button
-                type="button"
-                key={c.id}
-                disabled={!choosable}
-                onClick={() => onPick(step, c.id)}
-                className={`text-left rounded-md border-2 p-3 ${
-                  picked ? "border-ui-border-interactive bg-ui-bg-highlight" : "border-ui-border-base"
-                } ${choosable ? "hover:border-ui-border-strong" : "cursor-default"}`}
-                data-testid="step-choice"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <Text className="text-base-semi">{c.partner.name}</Text>
-                  {picked && <span className="text-small-regular text-ui-fg-interactive">✓ Your pick</span>}
-                </div>
-                <Text className="text-small-regular text-ui-fg-base">
-                  {c.estimate
-                    ? `≈ ${range(c.estimate.low, c.estimate.high, c.estimate.currency_code)} per piece`
-                    : "Price: we'll confirm"}
-                </Text>
-                {c.note && <Text className="text-small-regular text-ui-fg-subtle">{c.note}</Text>}
-                {photos.length > 0 ? (
-                  <div className="flex gap-1.5 mt-2">
-                    {photos.map((p) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={p} src={p} alt="" className="h-14 w-14 object-cover rounded border border-ui-border-base" />
-                    ))}
-                  </div>
-                ) : c.samples.length > 0 ? (
-                  <Text className="text-small-regular text-ui-fg-muted mt-1">
-                    Has made: {c.samples.map((s) => s.title).join(", ")}
-                  </Text>
-                ) : null}
-                {c.estimate && !c.estimate.rate_confirmed && (
-                  <Text className="text-small-regular text-ui-fg-muted">Rate not yet confirmed</Text>
-                )}
-              </button>
-            )
-          })}
+          {step.choices.map((c) => (
+            <WorkshopCard
+              key={c.id}
+              choice={c}
+              picked={step.selected_choice_id === c.id}
+              choosable={editable && step.choices.length > 1}
+              onPick={() => onPick(step, c.id)}
+            />
+          ))}
         </div>
       )}
     </li>
+  )
+}
+
+/** One workshop for one step: price, past work, and who they are (public profile only). */
+function WorkshopCard({
+  choice: c,
+  picked,
+  choosable,
+  onPick,
+}: {
+  choice: BriefStep["choices"][number]
+  picked: boolean
+  choosable: boolean
+  onPick: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const w = c.partner
+  const photos = [...c.samples.flatMap((s) => s.photos), ...(w.photos ?? [])].filter((v, i, a) => a.indexOf(v) === i).slice(0, 3)
+  const hasProfile = !!(w.profile_url || w.tagline || w.about || w.team_size || w.pieces_made)
+  const lead = c.estimate?.lead_days
+  return (
+    <div
+      className={`rounded-md border-2 p-3 flex flex-col ${picked ? "border-ui-border-interactive bg-ui-bg-highlight" : "border-ui-border-base"}`}
+      data-testid="step-choice"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          {w.logo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={w.logo} alt="" className="h-7 w-7 rounded-full object-cover border border-ui-border-base" />
+          )}
+          <Text className="text-base-semi">{w.name}</Text>
+        </div>
+        {picked && <span className="text-small-regular text-ui-fg-interactive">✓ Your pick</span>}
+      </div>
+      {w.tagline && <Text className="text-small-regular text-ui-fg-subtle italic">{w.tagline}</Text>}
+      <Text className="text-small-regular text-ui-fg-base mt-1">
+        {c.estimate ? `≈ ${range(c.estimate.low, c.estimate.high, c.estimate.currency_code)} per piece` : "Price: we'll confirm"}
+        {lead ? ` · about ${lead} days` : ""}
+      </Text>
+      {c.note && <Text className="text-small-regular text-ui-fg-subtle">{c.note}</Text>}
+      {photos.length > 0 ? (
+        <div className="flex gap-1.5 mt-2">
+          {photos.map((p) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={p} src={p} alt="" className="h-14 w-14 object-cover rounded border border-ui-border-base" />
+          ))}
+        </div>
+      ) : c.samples.length > 0 ? (
+        <Text className="text-small-regular text-ui-fg-muted mt-1">Has made: {c.samples.map((s) => s.title).join(", ")}</Text>
+      ) : null}
+      {c.estimate && !c.estimate.rate_confirmed && <Text className="text-small-regular text-ui-fg-muted">Rate not yet confirmed</Text>}
+
+      {hasProfile && (
+        <button type="button" className="text-left text-small-regular text-ui-fg-interactive mt-2" onClick={() => setOpen(!open)} data-testid="workshop-about">
+          {open ? "Hide" : "About this workshop"}
+        </button>
+      )}
+      {open && (
+        <div className="mt-2 rounded border border-ui-border-base bg-ui-bg-base p-2 flex flex-col gap-1" data-testid="workshop-profile">
+          {w.about && <Text className="text-small-regular text-ui-fg-base">{w.about}</Text>}
+          {(w.team_size || w.roles.length > 0) && (
+            <Text className="text-small-regular text-ui-fg-subtle">
+              {w.team_size ? `Team of ${w.team_size}` : ""}
+              {w.team_size && w.roles.length ? ": " : ""}
+              {w.roles.map((r) => `${r.count} ${r.role}`).join(", ")}
+            </Text>
+          )}
+          {!!w.pieces_made && (
+            <Text className="text-small-regular text-ui-fg-subtle">
+              {w.pieces_made} pieces made with us{w.making_since ? ` since ${new Date(w.making_since).getUTCFullYear()}` : ""}
+            </Text>
+          )}
+        </div>
+      )}
+      {(w.profile_url || w.store_url) && (
+        <div className="flex flex-wrap gap-x-3 mt-2">
+          {w.profile_url && (
+            <a href={w.profile_url} target="_blank" rel="noreferrer" className="text-small-regular underline text-ui-fg-subtle">
+              Their page ↗
+            </a>
+          )}
+          {w.store_url && (
+            <a href={w.store_url} target="_blank" rel="noreferrer" className="text-small-regular underline text-ui-fg-subtle">
+              Their shop ↗
+            </a>
+          )}
+        </div>
+      )}
+      {choosable && (
+        <Button size="small" variant={picked ? "secondary" : "primary"} className="mt-3 self-start" onClick={onPick} data-testid="pick-workshop">
+          {picked ? "Undo pick" : "Pick this workshop"}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+const fmtDate = (iso: string) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+
+const VERDICT: Record<string, { text: string; cls: string }> = {
+  on_track: { text: "On track for your date", cls: "bg-ui-tag-green-bg border-ui-tag-green-border" },
+  tight: { text: "Tight for your date: we'll plan it closely", cls: "bg-ui-tag-orange-bg border-ui-tag-orange-border" },
+  too_soon: { text: "Too soon for your date: let's talk about options", cls: "bg-ui-tag-red-bg border-ui-tag-red-border" },
+  unknown: { text: "We'll confirm the timing against your date", cls: "bg-ui-bg-subtle border-ui-border-base" },
+}
+
+/** Samples, then production after she approves them, checked against her date. Estimates. */
+function TimelineBox({ option }: { option: BriefOption }) {
+  const t = option.timeline
+  if (!t.sample_days && t.production_high == null && !t.unknown_steps.length) return null
+  const v = t.verdict ? VERDICT[t.verdict] : null
+  return (
+    <div className="mt-4 rounded-md border border-ui-border-base p-4" data-testid="option-timeline">
+      <Text className="text-small-regular text-ui-fg-muted uppercase tracking-wide">Timeline, estimated</Text>
+      <ol className="mt-2 flex flex-col gap-1">
+        <li>
+          <Text className="text-small-regular">
+            <span className="text-base-semi">Samples:</span>{" "}
+            {t.sample_days ? `about ${t.sample_days} days after you send this brief` : "we'll confirm"}
+          </Text>
+        </li>
+        <li>
+          <Text className="text-small-regular">
+            <span className="text-base-semi">Production:</span>{" "}
+            {t.production_high != null
+              ? `${t.production_low === t.production_high ? t.production_high : `${t.production_low}–${t.production_high}`} days after you approve the samples`
+              : "we'll confirm"}
+            {t.unknown_steps.length ? <span className="text-ui-fg-subtle"> (still to confirm: {t.unknown_steps.join(", ")})</span> : null}
+          </Text>
+        </li>
+        {t.ready_low && t.ready_high && (
+          <li>
+            <Text className="text-small-regular">
+              <span className="text-base-semi">Ready to ship:</span> around{" "}
+              {t.ready_low === t.ready_high ? fmtDate(t.ready_high) : `${fmtDate(t.ready_low)} – ${fmtDate(t.ready_high)}`}, if you approve samples
+              the day they arrive
+            </Text>
+          </li>
+        )}
+      </ol>
+      {v && t.deadline && (
+        <div className={`mt-2 rounded border px-3 py-1.5 ${v.cls}`} data-testid="timeline-verdict">
+          <Text className="text-small-regular">
+            You need them by {fmtDate(t.deadline)}. {v.text}.
+          </Text>
+        </div>
+      )}
+      <Text className="text-ui-fg-muted text-small-regular mt-1">Shipping time is not included.</Text>
+    </div>
   )
 }
 
@@ -459,9 +580,11 @@ function EstimateBox({ option, compact = false, fxLine = null }: { option: Brief
 }
 
 /** What she can tell HER customers: our line for the style, plus one factual line per craft. */
-function StoryBox({ option }: { option: BriefOption }) {
+function StoryBox({ option, link }: { option: BriefOption; link: LinkCtx }) {
+  const { token, countryCode } = link
   const { headline, points } = option.story
   if (!headline && !points.length) return null
+  const card = `/api/briefs/${encodeURIComponent(token)}/story-card?option=${encodeURIComponent(option.id)}&country=${encodeURIComponent(countryCode)}`
   return (
     <div className="mt-5 rounded-md border border-ui-border-base p-4" data-testid="option-story">
       <Text className="text-small-regular text-ui-fg-muted uppercase tracking-wide">The story you can tell your customers</Text>
@@ -476,11 +599,29 @@ function StoryBox({ option }: { option: BriefOption }) {
           </li>
         ))}
       </ul>
+      <a
+        href={card}
+        download={`story-${option.title.replace(/[^A-Za-z0-9]+/g, "-").toLowerCase()}.png`}
+        className="inline-block mt-3 text-small-regular underline text-ui-fg-interactive"
+        data-testid="story-card-download"
+      >
+        Download story card (image)
+      </a>
     </div>
   )
 }
 
-function Summary({ brief, chosen, fxLine = null }: { brief: BriefView; chosen: BriefOption[]; fxLine?: string | null }) {
+function Summary({
+  brief,
+  chosen,
+  link,
+  fxLine = null,
+}: {
+  brief: BriefView
+  chosen: BriefOption[]
+  link: LinkCtx
+  fxLine?: string | null
+}) {
   const answered = brief.questions.filter((q) => q.answer != null && !(Array.isArray(q.answer) && !q.answer.length))
   return (
     <div className="flex flex-col gap-6 mt-6" data-testid="brief-summary">
@@ -507,7 +648,8 @@ function Summary({ brief, chosen, fxLine = null }: { brief: BriefView; chosen: B
               )
             })}
           </ul>
-          <StoryBox option={o} />
+          <StoryBox option={o} link={link} />
+          <TimelineBox option={o} />
           <EstimateBox option={o} compact fxLine={fxLine} />
         </>
         )}
@@ -537,7 +679,17 @@ function Summary({ brief, chosen, fxLine = null }: { brief: BriefView; chosen: B
   )
 }
 
-function StatusView({ brief, chosen, onEdit }: { brief: BriefView; chosen: BriefOption[]; onEdit: (() => void) | null }) {
+function StatusView({
+  brief,
+  chosen,
+  onEdit,
+  link,
+}: {
+  brief: BriefView
+  chosen: BriefOption[]
+  onEdit: (() => void) | null
+  link: LinkCtx
+}) {
   const stage = brief.status === "sampling" ? 2 : brief.status === "quoted" || brief.status === "closed" ? 3 : 1
   const stages = ["Brief sent", brief.sample_quantity ? `${brief.sample_quantity} samples being made` : "Workshops checking", "Prices confirmed"]
   return (
@@ -590,7 +742,7 @@ function StatusView({ brief, chosen, onEdit }: { brief: BriefView; chosen: Brief
       <Heading level="h2" className="text-xl-semi mt-10 mb-2">
         What you asked for
       </Heading>
-      <Summary brief={brief} chosen={chosen} fxLine={fxNote(brief.fx)} />
+      <Summary brief={brief} chosen={chosen} link={link} fxLine={fxNote(brief.fx)} />
 
       {onEdit ? (
         <div className="mt-6">
