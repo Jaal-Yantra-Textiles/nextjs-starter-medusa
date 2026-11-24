@@ -13,30 +13,35 @@ import {
 import { convertToLocale } from "@lib/util/money"
 
 /**
- * The buyer's brief (#2608 S1).
+ * The buyer's brief (#2608 S1), as a wizard.
  *
- * She sees who would make each step (by name, with their sample photos), an
- * ESTIMATE where a workshop has a rate, "we'll confirm" where it doesn't and
- * "we're exploring partners" where nobody can yet. Every figure is labelled as
- * an estimate; the numbers come from the backend and are never computed here.
+ *   Welcome (first visit) → 1 Style → 2 Workshops → 3 Details → 4 Review & send
+ *   → Status (updates, sample photos), with "Edit my brief" until sampling.
+ *
+ * Every figure is an ESTIMATE from the backend; nothing is priced here.
+ * Progress is saved on every Next, so she can leave and come back.
  */
-const money = (amount: number, currency: string) =>
-  convertToLocale({ amount, currency_code: currency })
-
+const money = (amount: number, currency: string) => convertToLocale({ amount, currency_code: currency })
 const range = (low: number, high: number, currency: string) =>
   low === high ? money(low, currency) : `${money(low, currency)} – ${money(high, currency)}`
 
-const STATUS_COPY: Record<BriefView["status"], string | null> = {
-  draft: null,
-  open: null,
-  submitted: "Thanks, we have your brief. You can still change it until we start your samples.",
-  sampling: "Your sample pieces are being made. We'll post photos and updates here.",
-  quoted: "Your priced quote is ready. Check your email for the link.",
-  closed: "This brief is closed.",
+type Screen = "welcome" | "style" | "workshops" | "details" | "review" | "status"
+const STEPS: { key: Screen; label: string }[] = [
+  { key: "style", label: "Style" },
+  { key: "workshops", label: "Workshops" },
+  { key: "details", label: "Details" },
+  { key: "review", label: "Review" },
+]
+
+const firstScreen = (b: BriefView): Screen => {
+  if (b.submitted_at || !b.editable) return "status"
+  const started = b.options.some((o) => o.buyer_selected) || b.questions.some((q) => q.answer != null)
+  return started ? "style" : "welcome"
 }
 
 export default function BriefTemplate({ brief: initial, token }: { brief: BriefView; token: string }) {
   const [brief, setBrief] = useState(initial)
+  const [screen, setScreen] = useState<Screen>(() => firstScreen(initial))
   const [answers, setAnswers] = useState<Record<string, unknown>>(() =>
     Object.fromEntries(initial.questions.map((q) => [q.key, q.answer ?? (q.kind === "multi_choice" ? [] : "")]))
   )
@@ -44,149 +49,144 @@ export default function BriefTemplate({ brief: initial, token }: { brief: BriefV
     () => new Set(initial.options.filter((o) => o.buyer_selected).map((o) => o.id))
   )
   const [error, setError] = useState<string | null>(null)
-  const [saved, setSaved] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const editable = brief.editable
 
-  const persist = (extra: { submit?: boolean; step_choices?: Record<string, string | null> } = {}) => {
+  const go = (next: Screen) => {
+    setScreen(next)
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const persist = (
+    extra: { submit?: boolean; step_choices?: Record<string, string | null> } = {},
+    then?: Screen
+  ) => {
     setError(null)
-    setSaved(null)
     startTransition(async () => {
-      const cleaned = Object.fromEntries(
-        Object.entries(answers).map(([k, v]) => [k, v === "" ? null : v])
-      )
-      const res = await saveBrief(token, {
-        answers: cleaned,
-        selected_option_ids: Array.from(selected),
-        ...extra,
-      })
+      const cleaned = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v === "" ? null : v]))
+      const res = await saveBrief(token, { answers: cleaned, selected_option_ids: Array.from(selected), ...extra })
       if (res.error || !res.brief) {
-        setError(res.error ?? "Could not save.")
+        setError(res.error ?? "Could not save. Please try again.")
         return
       }
       setBrief(res.brief)
-      setSaved(extra.submit ? "Sent. Thank you!" : extra.step_choices ? null : "Saved.")
+      if (then) go(then)
     })
   }
 
   const pickChoice = (step: BriefStep, choiceId: string) => {
     if (!editable) return
-    const next = step.selected_choice_id === choiceId ? null : choiceId
-    persist({ step_choices: { [step.id]: next } })
+    persist({ step_choices: { [step.id]: step.selected_choice_id === choiceId ? null : choiceId } })
   }
 
-  const statusLine = STATUS_COPY[brief.status]
-  // The questions only make sense once she has picked what she wants made.
-  const showForm = selected.size > 0 || !!brief.submitted_at
+  const chosen = brief.options.filter((o) => selected.has(o.id))
+  const stepIndex = STEPS.findIndex((s) => s.key === screen)
 
   return (
-    <div className="content-container py-12 max-w-6xl">
-      <div className="flex flex-col gap-y-2">
-        <Text className="text-ui-fg-subtle text-small-regular uppercase tracking-wide">
-          Brief{brief.lead.name ? ` from ${brief.lead.name}` : ""}
-        </Text>
-        <Heading level="h1" className="text-2xl-semi text-ui-fg-base" data-testid="brief-title">
-          {brief.title}
-        </Heading>
-        {brief.recipient_name && (
-          <Text className="text-ui-fg-subtle">
-            For {brief.recipient_name}
-            {brief.recipient_company ? `, ${brief.recipient_company}` : ""}
-          </Text>
-        )}
-        {brief.intro && <Text className="text-ui-fg-base mt-2 whitespace-pre-line">{brief.intro}</Text>}
-      </div>
+    <div className="content-container py-10 max-w-5xl">
+      <Header brief={brief} />
 
       {brief.link_state !== "live" && (
         <Banner tone="warn">
           {brief.link_state === "expired"
-            ? "This link has expired. Ask us for a fresh one and nothing you entered is lost."
+            ? "This link has expired. Ask us for a fresh one; nothing you entered is lost."
             : "This brief is closed."}
         </Banner>
       )}
-      {statusLine && brief.link_state === "live" && <Banner tone="info">{statusLine}</Banner>}
 
-      {brief.sample_quantity ? (
-        <Section title="How this works">
-          <ol className="list-decimal pl-5 flex flex-col gap-1 text-ui-fg-base">
-            <li>You pick the options and workshops you like and answer a few questions.</li>
-            <li>
-              We make <strong>{brief.sample_quantity} sample pieces</strong> first and post photos here, on this
-              same page.
-            </li>
-            <li>Once you're happy with the samples, we confirm every price and send you a quote to pay.</li>
-          </ol>
-        </Section>
-      ) : null}
+      {stepIndex >= 0 && <Progress current={stepIndex} onJump={(i) => i < stepIndex && go(STEPS[i].key)} />}
 
-      {brief.updates.length > 0 && (
-        <Section title="Updates">
-          <ul className="flex flex-col gap-4" data-testid="brief-updates">
-            {brief.updates.map((u) => (
-              <li key={u.id} className="border-l-2 border-ui-border-strong pl-4">
-                <Text className="text-ui-fg-muted text-small-regular">
-                  {new Date(u.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
-                  {u.kind === "sample" ? " · Samples" : u.kind === "price" ? " · Price" : ""}
-                </Text>
-                <Text className="text-ui-fg-base whitespace-pre-line">{u.message}</Text>
-                {u.media_urls.length > 0 && (
-                  <div className="flex gap-2 mt-2 flex-wrap">
-                    {u.media_urls.map((url) => (
-                      <a key={url} href={url} target="_blank" rel="noreferrer">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="h-28 w-28 object-cover rounded-md border border-ui-border-base" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </li>
+      {screen === "welcome" && <Welcome brief={brief} onStart={() => go("style")} />}
+
+      {screen === "style" && (
+        <Panel
+          title="Which style do you like?"
+          lead="Pick one or more. Each style is made by a different mix of workshops. You can change your mind later."
+        >
+          <div className="grid gap-4 md:grid-cols-2" data-testid="brief-styles">
+            {brief.options.map((o) => (
+              <StyleCard
+                key={o.id}
+                option={o}
+                checked={selected.has(o.id)}
+                disabled={!editable || pending}
+                onToggle={() => {
+                  const next = new Set(selected)
+                  next.has(o.id) ? next.delete(o.id) : next.add(o.id)
+                  setSelected(next)
+                }}
+              />
             ))}
-          </ul>
-        </Section>
+          </div>
+          <Nav
+            pending={pending}
+            back={() => go("welcome")}
+            next={() => persist({}, "workshops")}
+            nextDisabled={!selected.size}
+            nextHint={!selected.size ? "Pick at least one style" : null}
+          />
+        </Panel>
       )}
 
-      <Banner tone="estimate">{brief.estimate_disclaimer}</Banner>
+      {screen === "workshops" && (
+        <Panel
+          title="Who would you like to make it?"
+          lead="These are the workshops for each step, with work they've done before. Pick one where there's a choice, or leave it and we'll recommend one."
+        >
+          <OptionTabs
+            options={chosen}
+            testId="brief-workshops"
+            render={(o) => (
+              <>
+                <ol className="flex flex-col gap-5">
+                  {o.steps.map((s, i) => (
+                    <StepPicker key={s.id} index={i} step={s} editable={editable && !pending} onPick={pickChoice} />
+                  ))}
+                </ol>
+                <EstimateBox option={o} compact />
+              </>
+            )}
+          />
+          <Nav pending={pending} back={() => go("style")} next={() => persist({}, "details")} />
+        </Panel>
+      )}
 
-      <Section title="Options">
-        <Text className="text-ui-fg-subtle -mt-2 mb-4">
-          Tick the options you're interested in. You can pick more than one.
-        </Text>
-        <div className="grid gap-6 md:grid-cols-2 items-start" data-testid="brief-options">
-          {brief.options.map((o) => (
-            <OptionCard
-              key={o.id}
-              option={o}
-              checked={selected.has(o.id)}
-              editable={editable && !pending}
-              onToggle={() => {
-                const next = new Set(selected)
-                next.has(o.id) ? next.delete(o.id) : next.add(o.id)
-                setSelected(next)
-              }}
-              onPick={pickChoice}
-            />
-          ))}
-        </div>
-      </Section>
+      {screen === "details" && (
+        <Panel title="Tell us about your order" lead="A best guess is fine. The quantity is what the estimate is based on.">
+          <div className="flex flex-col gap-5 max-w-2xl" data-testid="brief-form">
+            {brief.questions.map((q) => (
+              <QuestionField
+                key={q.id}
+                q={q}
+                value={answers[q.key]}
+                disabled={!editable || pending}
+                onChange={(v) => setAnswers((a) => ({ ...a, [q.key]: v }))}
+              />
+            ))}
+          </div>
+          <Nav pending={pending} back={() => go("workshops")} next={() => persist({}, "review")} nextLabel="Review" />
+        </Panel>
+      )}
 
-      {!showForm ? (
-        <div className="mt-10 rounded-md border border-dashed border-ui-border-strong px-4 py-6 text-center" data-testid="brief-form-hint">
-          <Text className="text-ui-fg-subtle">Tick at least one option above, then tell us about your order.</Text>
-        </div>
-      ) : (
-      <Section title="About your order">
-        <div className="flex flex-col gap-5 max-w-2xl" data-testid="brief-form">
-          {brief.questions.map((q) => (
-            <QuestionField
-              key={q.id}
-              q={q}
-              value={answers[q.key]}
-              disabled={!editable || pending}
-              onChange={(v) => setAnswers((a) => ({ ...a, [q.key]: v }))}
-            />
-          ))}
-        </div>
-      </Section>
+      {screen === "review" && (
+        <Panel title="Check and send" lead="Here's what we'll take to the workshops.">
+          <Banner tone="estimate">{brief.estimate_disclaimer}</Banner>
+          <Summary brief={brief} chosen={chosen} />
+          <Nav
+            pending={pending}
+            back={() => go("details")}
+            next={() => persist({ submit: true }, "status")}
+            nextLabel={brief.submitted_at ? "Send changes" : "Send my brief"}
+          />
+        </Panel>
+      )}
+
+      {screen === "status" && (
+        <StatusView
+          brief={brief}
+          chosen={chosen}
+          onEdit={editable ? () => go("style") : null}
+        />
       )}
 
       {error && (
@@ -194,154 +194,468 @@ export default function BriefTemplate({ brief: initial, token }: { brief: BriefV
           {error}
         </Text>
       )}
-      {saved && <Text className="text-ui-fg-interactive mt-4">{saved}</Text>}
+    </div>
+  )
+}
 
-      {editable && showForm && (
-        <div className="flex gap-3 mt-6">
-          <Button variant="secondary" isLoading={pending} onClick={() => persist()} data-testid="brief-save">
-            Save
-          </Button>
-          <Button isLoading={pending} onClick={() => persist({ submit: true })} data-testid="brief-send">
-            {brief.submitted_at ? "Send changes" : "Send my brief"}
-          </Button>
+/* ---------- screens ---------- */
+
+function Header({ brief }: { brief: BriefView }) {
+  return (
+    <div className="flex flex-col gap-1 mb-6">
+      <Text className="text-ui-fg-subtle text-small-regular uppercase tracking-wide">
+        {brief.lead.name ? `Prepared by ${brief.lead.name}` : "Your brief"}
+        {brief.recipient_name ? ` for ${brief.recipient_name}` : ""}
+      </Text>
+      <Heading level="h1" className="text-2xl-semi text-ui-fg-base" data-testid="brief-title">
+        {brief.title}
+      </Heading>
+    </div>
+  )
+}
+
+function Welcome({ brief, onStart }: { brief: BriefView; onStart: () => void }) {
+  const workshops = new Set(brief.options.flatMap((o) => o.steps.flatMap((s) => s.choices.map((c) => c.partner.id))))
+  const steps = [
+    { n: 1, title: "Choose a style", body: `${brief.options.length} ways your piece could be made.` },
+    { n: 2, title: "Meet the workshops", body: `${workshops.size} workshops, with work they've made before. Pick who makes what.` },
+    { n: 3, title: "Tell us the details", body: "Quantity, size, colours, artwork and when you need it." },
+    {
+      n: 4,
+      title: brief.sample_quantity ? `We make ${brief.sample_quantity} samples` : "We confirm prices",
+      body: brief.sample_quantity
+        ? "Photos appear on this page. Once you're happy, we confirm every price and send a quote to pay."
+        : "We check every figure with the workshops and send a quote to pay.",
+    },
+  ]
+  return (
+    <section data-testid="brief-welcome">
+      {brief.intro && <Text className="text-large-regular text-ui-fg-base max-w-3xl whitespace-pre-line">{brief.intro}</Text>}
+      <Heading level="h2" className="text-xl-semi mt-8 mb-4">
+        How it works
+      </Heading>
+      <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {steps.map((s) => (
+          <li key={s.n} className="rounded-lg border border-ui-border-base p-4 flex flex-col gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ui-bg-interactive text-ui-fg-on-color text-base-semi">
+              {s.n}
+            </span>
+            <Text className="text-base-semi">{s.title}</Text>
+            <Text className="text-ui-fg-subtle text-small-regular">{s.body}</Text>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-6 rounded-md bg-ui-bg-subtle px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6">
+        <Text className="text-ui-fg-base">⏱ About 3 minutes</Text>
+        <Text className="text-ui-fg-base">Nothing to pay now</Text>
+        <Text className="text-ui-fg-base">Prices shown are estimates until we confirm them</Text>
+      </div>
+      <div className="mt-8">
+        <Button size="large" onClick={onStart} data-testid="brief-start">
+          Let's start
+        </Button>
+      </div>
+    </section>
+  )
+}
+
+function StyleCard({
+  option,
+  checked,
+  disabled,
+  onToggle,
+}: {
+  option: BriefOption
+  checked: boolean
+  disabled: boolean
+  onToggle: () => void
+}) {
+  const e = option.estimate
+  const exploring = option.steps.filter((s) => s.state === "exploring").length
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      disabled={disabled}
+      aria-pressed={checked}
+      className={`text-left rounded-lg border-2 p-5 transition-colors ${
+        checked ? "border-ui-border-interactive bg-ui-bg-highlight" : "border-ui-border-base hover:border-ui-border-strong"
+      }`}
+      data-testid="brief-style"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <Heading level="h3" className="text-large-semi">
+          {option.title}
+        </Heading>
+        <span
+          className={`mt-1 h-5 w-5 shrink-0 rounded border-2 flex items-center justify-center text-[12px] ${
+            checked ? "border-ui-border-interactive bg-ui-bg-interactive text-ui-fg-on-color" : "border-ui-border-strong"
+          }`}
+        >
+          {checked ? "✓" : ""}
+        </span>
+      </div>
+      {option.description && <Text className="text-ui-fg-subtle mt-1">{option.description}</Text>}
+      <div className="flex flex-wrap gap-1.5 mt-3">
+        {option.steps.map((s) => (
+          <span
+            key={s.id}
+            className={`rounded-full px-2.5 py-0.5 text-small-regular border ${
+              s.state === "exploring" ? "border-dashed border-ui-border-strong text-ui-fg-muted" : "border-ui-border-base"
+            }`}
+          >
+            {s.label}
+          </span>
+        ))}
+      </div>
+      <div className="mt-4">
+        {e.per_piece_high > 0 ? (
+          <Text className="text-ui-fg-base">
+            <span className="text-base-semi">≈ {range(e.per_piece_low, e.per_piece_high, e.currency_code)}</span>{" "}
+            <span className="text-ui-fg-subtle">per piece{e.complete ? "" : " so far"}</span>
+          </Text>
+        ) : (
+          <Text className="text-ui-fg-subtle">Prices to confirm</Text>
+        )}
+        {exploring > 0 && (
+          <Text className="text-small-regular text-ui-fg-muted">
+            We're still finding a workshop for {exploring === 1 ? "one step" : `${exploring} steps`}
+          </Text>
+        )}
+      </div>
+    </button>
+  )
+}
+
+function StepPicker({
+  index,
+  step,
+  editable,
+  onPick,
+}: {
+  index: number
+  step: BriefStep
+  editable: boolean
+  onPick: (s: BriefStep, choiceId: string) => void
+}) {
+  return (
+    <li>
+      <Text className="text-base-semi">
+        {index + 1}. {step.label}
+      </Text>
+      {step.note && <Text className="text-small-regular text-ui-fg-subtle">{step.note}</Text>}
+      {step.state === "exploring" ? (
+        <div className="mt-2 rounded-md border border-dashed border-ui-border-strong px-3 py-2">
+          <Text className="text-ui-fg-subtle">We're exploring partners for this step and will come back to you.</Text>
+        </div>
+      ) : (
+        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {step.choices.map((c) => {
+            const picked = step.selected_choice_id === c.id
+            const choosable = editable && step.choices.length > 1
+            const photos = c.samples.flatMap((s) => s.photos).slice(0, 3)
+            return (
+              <button
+                type="button"
+                key={c.id}
+                disabled={!choosable}
+                onClick={() => onPick(step, c.id)}
+                className={`text-left rounded-md border-2 p-3 ${
+                  picked ? "border-ui-border-interactive bg-ui-bg-highlight" : "border-ui-border-base"
+                } ${choosable ? "hover:border-ui-border-strong" : "cursor-default"}`}
+                data-testid="step-choice"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <Text className="text-base-semi">{c.partner.name}</Text>
+                  {picked && <span className="text-small-regular text-ui-fg-interactive">✓ Your pick</span>}
+                </div>
+                <Text className="text-small-regular text-ui-fg-base">
+                  {c.estimate
+                    ? `≈ ${range(c.estimate.low, c.estimate.high, c.estimate.currency_code)} per piece`
+                    : "Price: we'll confirm"}
+                </Text>
+                {c.note && <Text className="text-small-regular text-ui-fg-subtle">{c.note}</Text>}
+                {photos.length > 0 ? (
+                  <div className="flex gap-1.5 mt-2">
+                    {photos.map((p) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={p} src={p} alt="" className="h-14 w-14 object-cover rounded border border-ui-border-base" />
+                    ))}
+                  </div>
+                ) : c.samples.length > 0 ? (
+                  <Text className="text-small-regular text-ui-fg-muted mt-1">
+                    Has made: {c.samples.map((s) => s.title).join(", ")}
+                  </Text>
+                ) : null}
+                {c.estimate && !c.estimate.rate_confirmed && (
+                  <Text className="text-small-regular text-ui-fg-muted">Rate not yet confirmed</Text>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </li>
+  )
+}
+
+function EstimateBox({ option, compact = false }: { option: BriefOption; compact?: boolean }) {
+  const e = option.estimate
+  return (
+    <div className={`rounded-md bg-ui-bg-subtle p-4 ${compact ? "mt-4" : ""}`} data-testid="option-estimate">
+      <Text className="text-small-regular text-ui-fg-muted uppercase tracking-wide">Estimate, not a confirmed price</Text>
+      {e.per_piece_high > 0 ? (
+        <>
+          <Text className="text-large-semi">
+            {range(e.per_piece_low, e.per_piece_high, e.currency_code)}{" "}
+            <span className="text-base-regular text-ui-fg-subtle">per piece{e.complete ? "" : ", so far"}</span>
+          </Text>
+          {e.setup_total > 0 && <Text className="text-ui-fg-subtle">+ {money(e.setup_total, e.currency_code)} one-time setup</Text>}
+          {e.quantity && e.total_low != null && e.total_high != null && (
+            <Text>
+              For {e.quantity} pieces: {range(e.total_low, e.total_high, e.currency_code)}
+            </Text>
+          )}
+        </>
+      ) : (
+        <Text className="text-ui-fg-subtle">No figure yet. We'll confirm with the workshops.</Text>
+      )}
+      {e.pending_steps.length > 0 && <Text className="text-ui-fg-subtle">Still to confirm: {e.pending_steps.join(", ")}</Text>}
+      <Text className="text-ui-fg-muted text-small-regular mt-1">Freight and taxes not included.</Text>
+    </div>
+  )
+}
+
+function Summary({ brief, chosen }: { brief: BriefView; chosen: BriefOption[] }) {
+  const answered = brief.questions.filter((q) => q.answer != null && !(Array.isArray(q.answer) && !q.answer.length))
+  return (
+    <div className="flex flex-col gap-6 mt-6" data-testid="brief-summary">
+      <OptionTabs
+        options={chosen}
+        render={(o) => (
+        <>
+          <ul className="flex flex-col gap-1">
+            {o.steps.map((s) => {
+              const pick = s.choices.find((c) => c.id === s.selected_choice_id)
+              return (
+                <li key={s.id} className="flex flex-wrap gap-x-2">
+                  <Text className="text-ui-fg-subtle min-w-[10rem]">{s.label}</Text>
+                  <Text className="text-ui-fg-base">
+                    {s.state === "exploring"
+                      ? "Workshop to be found"
+                      : pick
+                        ? pick.partner.name
+                        : s.choices.length === 1
+                          ? s.choices[0].partner.name
+                          : `We'll recommend (${s.choices.map((c) => c.partner.name).join(" or ")})`}
+                  </Text>
+                </li>
+              )
+            })}
+          </ul>
+          <EstimateBox option={o} compact />
+        </>
+        )}
+      />
+      {answered.length > 0 && (
+        <div className="rounded-lg border border-ui-border-base p-5">
+          <Heading level="h3" className="text-large-semi mb-2">
+            Your details
+          </Heading>
+          <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-[14rem_1fr]">
+            {answered.map((q) => (
+              <div key={q.id} className="contents">
+                <dt className="text-ui-fg-subtle">{q.label}</dt>
+                <dd className="text-ui-fg-base break-words">
+                  {Array.isArray(q.answer) ? q.answer.join(", ") : String(q.answer)}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
       )}
     </div>
   )
 }
 
-function OptionCard({
-  option,
-  checked,
-  editable,
-  onToggle,
-  onPick,
-}: {
-  option: BriefOption
-  checked: boolean
-  editable: boolean
-  onToggle: () => void
-  onPick: (step: BriefStep, choiceId: string) => void
-}) {
-  const e = option.estimate
-  const hasFigure = e.per_piece_high > 0
+function StatusView({ brief, chosen, onEdit }: { brief: BriefView; chosen: BriefOption[]; onEdit: (() => void) | null }) {
+  const stage = brief.status === "sampling" ? 2 : brief.status === "quoted" || brief.status === "closed" ? 3 : 1
+  const stages = ["Brief sent", brief.sample_quantity ? `${brief.sample_quantity} samples being made` : "Workshops checking", "Prices confirmed"]
   return (
-    <div
-      className={`rounded-lg border p-5 ${checked ? "border-ui-border-interactive" : "border-ui-border-base"}`}
-      data-testid="brief-option"
-    >
-      <label className="flex items-start gap-3 cursor-pointer">
-        <input type="checkbox" className="mt-1.5" checked={checked} disabled={!editable} onChange={onToggle} />
-        <div>
-          <Heading level="h2" className="text-xl-semi">
-            {option.title}
-          </Heading>
-          {option.description && <Text className="text-ui-fg-subtle">{option.description}</Text>}
-          <Text className="text-ui-fg-muted text-small-regular">I'm interested in this option</Text>
-        </div>
-      </label>
-
-      <ol className="mt-4 flex flex-col gap-4">
-        {option.steps.map((s, i) => (
-          <li key={s.id}>
-            <Text className="text-base-semi">
-              {i + 1}. {s.label}
-              {s.technique_label && s.technique_label !== s.label ? (
-                <span className="text-ui-fg-muted font-normal"> · {s.technique_label}</span>
-              ) : null}
-            </Text>
-            {s.note && <Text className="text-ui-fg-subtle text-small-regular">{s.note}</Text>}
-            {s.state === "exploring" ? (
-              <Text className="text-ui-fg-subtle italic mt-1" data-testid="step-exploring">
-                We're exploring partners for this step.
-              </Text>
-            ) : (
-              <div className="mt-2 grid gap-2">
-                {s.choices.map((c) => {
-                  const picked = s.selected_choice_id === c.id
-                  return (
-                    <button
-                      type="button"
-                      key={c.id}
-                      disabled={!editable || s.choices.length < 2}
-                      onClick={() => onPick(s, c.id)}
-                      className={`text-left rounded-md border p-3 ${
-                        picked ? "border-ui-border-interactive bg-ui-bg-highlight" : "border-ui-border-base"
-                      } ${s.choices.length > 1 && editable ? "hover:border-ui-border-strong" : "cursor-default"}`}
-                      data-testid="step-choice"
-                    >
-                      <Text className="text-base-semi">{c.partner.name}</Text>
-                      <Text className="text-small-regular text-ui-fg-subtle">
-                        {c.estimate
-                          ? `≈ ${range(c.estimate.low, c.estimate.high, c.estimate.currency_code)} per piece${
-                              c.estimate.qty_per_piece !== 1 ? ` (${c.estimate.qty_per_piece} ${c.estimate.unit})` : ""
-                            }`
-                          : "Price: we'll confirm"}
-                      </Text>
-                      {c.estimate && !c.estimate.rate_confirmed && (
-                        <Text className="text-small-regular text-ui-fg-muted">Rate not yet confirmed by the workshop</Text>
-                      )}
-                      {c.estimate?.stale && (
-                        <Text className="text-small-regular text-ui-fg-muted">Older rate, we'll recheck it</Text>
-                      )}
-                      {c.note && <Text className="text-small-regular text-ui-fg-subtle">{c.note}</Text>}
-                      {c.samples.length > 0 && (
-                        <div className="flex gap-1.5 mt-2 flex-wrap">
-                          {c.samples
-                            .flatMap((smp) => smp.photos.slice(0, 2).map((p) => ({ p, t: smp.title })))
-                            .slice(0, 4)
-                            .map(({ p, t }) => (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img key={p} src={p} alt={t} title={t} className="h-14 w-14 object-cover rounded border border-ui-border-base" />
-                            ))}
-                        </div>
-                      )}
-                      {c.samples.length > 0 && c.samples.every((smp) => !smp.photos.length) && (
-                        <Text className="text-small-regular text-ui-fg-muted mt-1">
-                          Past work: {c.samples.map((smp) => smp.title).join(", ")}
-                        </Text>
-                      )}
-                      {s.choices.length > 1 && editable && (
-                        <Text className="text-small-regular text-ui-fg-interactive mt-1">
-                          {picked ? "Your pick (tap to undo)" : "Pick this workshop"}
-                        </Text>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
+    <section data-testid="brief-status">
+      <ol className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:items-center">
+        {stages.map((label, i) => (
+          <li key={label} className="flex items-center gap-2 sm:flex-1">
+            <span
+              className={`h-7 w-7 shrink-0 rounded-full flex items-center justify-center text-small-semi ${
+                i < stage ? "bg-ui-bg-interactive text-ui-fg-on-color" : "border-2 border-ui-border-strong text-ui-fg-muted"
+              }`}
+            >
+              {i < stage ? "✓" : i + 1}
+            </span>
+            <Text className={i < stage ? "text-base-semi" : "text-ui-fg-muted"}>{label}</Text>
+            {i < stages.length - 1 && <span className="hidden sm:block flex-1 h-px bg-ui-border-base mx-3" />}
           </li>
         ))}
       </ol>
 
-      <div className="mt-5 rounded-md bg-ui-bg-subtle p-4" data-testid="option-estimate">
-        <Text className="text-small-regular text-ui-fg-muted uppercase tracking-wide">Estimate, not a confirmed price</Text>
-        {hasFigure ? (
-          <>
-            <Text className="text-large-semi">
-              {range(e.per_piece_low, e.per_piece_high, e.currency_code)}{" "}
-              <span className="text-base-regular text-ui-fg-subtle">per piece{e.complete ? "" : ", so far"}</span>
-            </Text>
-            {e.setup_total > 0 && (
-              <Text className="text-ui-fg-subtle">+ {money(e.setup_total, e.currency_code)} one-time setup</Text>
-            )}
-            {e.quantity && e.total_low != null && e.total_high != null && (
-              <Text className="text-ui-fg-base">
-                For {e.quantity} pieces: {range(e.total_low, e.total_high, e.currency_code)}
+      <Heading level="h2" className="text-xl-semi mt-10 mb-4">
+        Updates
+      </Heading>
+      {brief.updates.length ? (
+        <ul className="flex flex-col gap-4" data-testid="brief-updates">
+          {brief.updates.map((u) => (
+            <li key={u.id} className="border-l-2 border-ui-border-strong pl-4">
+              <Text className="text-ui-fg-muted text-small-regular">
+                {new Date(u.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
+                {u.kind === "sample" ? " · Samples" : u.kind === "price" ? " · Price" : ""}
               </Text>
-            )}
-          </>
-        ) : (
-          <Text className="text-ui-fg-subtle">No estimate yet. We'll confirm prices with the workshops.</Text>
-        )}
-        {e.pending_steps.length > 0 && (
-          <Text className="text-ui-fg-subtle mt-1">Still to confirm: {e.pending_steps.join(", ")}</Text>
-        )}
-        {e.has_unconfirmed && (
-          <Text className="text-ui-fg-muted text-small-regular">Includes rates the workshop has not confirmed yet.</Text>
-        )}
-        <Text className="text-ui-fg-muted text-small-regular mt-1">Freight and taxes are not included.</Text>
+              <Text className="text-ui-fg-base whitespace-pre-line">{u.message}</Text>
+              {u.media_urls.length > 0 && (
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {u.media_urls.map((url) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="h-28 w-28 object-cover rounded-md border border-ui-border-base" />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <Text className="text-ui-fg-subtle">Nothing yet. We'll post here as soon as the workshops come back.</Text>
+      )}
+
+      <Heading level="h2" className="text-xl-semi mt-10 mb-2">
+        What you asked for
+      </Heading>
+      <Summary brief={brief} chosen={chosen} />
+
+      {onEdit ? (
+        <div className="mt-6">
+          <Button variant="secondary" onClick={onEdit} data-testid="brief-edit">
+            Edit my brief
+          </Button>
+          <Text className="text-small-regular text-ui-fg-muted mt-1">You can change it until we start your samples.</Text>
+        </div>
+      ) : brief.status === "sampling" ? (
+        <Text className="text-ui-fg-subtle mt-6">Your samples are being made from this brief, so it can't be changed here. Message us for any change.</Text>
+      ) : null}
+    </section>
+  )
+}
+
+/* ---------- pieces ---------- */
+
+/** One chosen style at a time. A single style shows without a tab bar. */
+function OptionTabs({
+  options,
+  render,
+  testId,
+}: {
+  options: BriefOption[]
+  render: (o: BriefOption) => React.ReactNode
+  testId?: string
+}) {
+  const [activeId, setActiveId] = useState<string | null>(options[0]?.id ?? null)
+  const active = options.find((o) => o.id === activeId) ?? options[0]
+  if (!active) return null
+  return (
+    <div className="rounded-lg border border-ui-border-base" data-testid={testId}>
+      {options.length > 1 ? (
+        <div role="tablist" className="flex overflow-x-auto border-b border-ui-border-base" data-testid="option-tabs">
+          {options.map((o) => {
+            const on = o.id === active.id
+            const e = o.estimate
+            return (
+              <button
+                key={o.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setActiveId(o.id)}
+                className={`px-5 py-3 text-left whitespace-nowrap border-b-2 -mb-px ${
+                  on ? "border-ui-border-interactive text-ui-fg-base" : "border-transparent text-ui-fg-muted hover:text-ui-fg-base"
+                }`}
+              >
+                <span className="block text-base-semi">{o.title}</span>
+                <span className="block text-small-regular">
+                  {e.per_piece_high > 0 ? `≈ ${range(e.per_piece_low, e.per_piece_high, e.currency_code)}${e.complete ? "" : " so far"}` : "Prices to confirm"}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="px-5 pt-4">
+          <Heading level="h3" className="text-large-semi">
+            {active.title}
+          </Heading>
+        </div>
+      )}
+      <div role="tabpanel" className="p-5">
+        {render(active)}
+      </div>
+    </div>
+  )
+}
+
+function Progress({ current, onJump }: { current: number; onJump: (i: number) => void }) {
+  return (
+    <ol className="flex gap-2 mb-8" data-testid="brief-progress">
+      {STEPS.map((s, i) => (
+        <li key={s.key} className="flex-1">
+          <button type="button" onClick={() => onJump(i)} disabled={i >= current} className="w-full text-left">
+            <span className={`block h-1.5 rounded-full ${i <= current ? "bg-ui-bg-interactive" : "bg-ui-border-base"}`} />
+            <Text className={`text-small-regular mt-1 ${i === current ? "text-ui-fg-base" : "text-ui-fg-muted"}`}>
+              {i + 1}. {s.label}
+            </Text>
+          </button>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+function Panel({ title, lead, children }: { title: string; lead?: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <Heading level="h2" className="text-xl-semi">
+        {title}
+      </Heading>
+      {lead && <Text className="text-ui-fg-subtle mt-1 mb-5 max-w-3xl">{lead}</Text>}
+      {children}
+    </section>
+  )
+}
+
+function Nav({
+  pending,
+  back,
+  next,
+  nextLabel = "Next",
+  nextDisabled = false,
+  nextHint = null,
+}: {
+  pending: boolean
+  back: () => void
+  next: () => void
+  nextLabel?: string
+  nextDisabled?: boolean
+  nextHint?: string | null
+}) {
+  return (
+    <div className="mt-8 flex items-center justify-between border-t border-ui-border-base pt-5">
+      <Button variant="transparent" onClick={back} disabled={pending} data-testid="brief-back">
+        ← Back
+      </Button>
+      <div className="flex items-center gap-3">
+        {nextHint && <Text className="text-small-regular text-ui-fg-muted">{nextHint}</Text>}
+        <Button onClick={next} isLoading={pending} disabled={nextDisabled} data-testid="brief-next">
+          {nextLabel}
+        </Button>
       </div>
     </div>
   )
@@ -359,15 +673,9 @@ function QuestionField({
   onChange: (v: unknown) => void
 }) {
   const id = `q-${q.key}`
-  const input =
-    "w-full rounded-md border border-ui-border-base bg-ui-bg-field px-3 py-2 text-base-regular disabled:opacity-70"
-  const label = (
-    <label htmlFor={id} className="text-base-semi">
-      {q.label}
-      {q.required && <span className="text-ui-fg-error"> *</span>}
-    </label>
-  )
+  const input = "w-full rounded-md border border-ui-border-base bg-ui-bg-field px-3 py-2 text-base-regular disabled:opacity-70"
   const help = q.help ? <Text className="text-small-regular text-ui-fg-muted">{q.help}</Text> : null
+  const star = q.required ? <span className="text-ui-fg-error"> *</span> : null
 
   if (q.kind === "multi_choice" || q.kind === "choice") {
     const current = q.kind === "multi_choice" ? (Array.isArray(value) ? (value as string[]) : []) : (value as string)
@@ -375,7 +683,7 @@ function QuestionField({
       <fieldset className="flex flex-col gap-1">
         <legend className="text-base-semi mb-1">
           {q.label}
-          {q.required && <span className="text-ui-fg-error"> *</span>}
+          {star}
         </legend>
         {help}
         <div className="flex flex-wrap gap-2 mt-1">
@@ -386,13 +694,12 @@ function QuestionField({
                 key={opt}
                 type="button"
                 disabled={disabled}
+                aria-pressed={on}
                 onClick={() => {
                   if (q.kind === "multi_choice") {
                     const list = current as string[]
                     onChange(on ? list.filter((x) => x !== opt) : [...list, opt])
-                  } else {
-                    onChange(on ? "" : opt)
-                  }
+                  } else onChange(on ? "" : opt)
                 }}
                 className={`rounded-full border px-3 py-1 text-small-regular ${
                   on ? "border-ui-border-interactive bg-ui-bg-highlight" : "border-ui-border-base"
@@ -409,7 +716,10 @@ function QuestionField({
 
   return (
     <div className="flex flex-col gap-1">
-      {label}
+      <label htmlFor={id} className="text-base-semi">
+        {q.label}
+        {star}
+      </label>
       {help}
       {q.kind === "long_text" ? (
         <textarea id={id} rows={3} className={input} disabled={disabled} value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />
@@ -430,17 +740,6 @@ function QuestionField({
   )
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-10">
-      <Heading level="h2" className="text-xl-semi mb-4">
-        {title}
-      </Heading>
-      {children}
-    </section>
-  )
-}
-
 function Banner({ tone, children }: { tone: "info" | "warn" | "estimate"; children: React.ReactNode }) {
   const cls =
     tone === "warn"
@@ -449,7 +748,7 @@ function Banner({ tone, children }: { tone: "info" | "warn" | "estimate"; childr
         ? "border-ui-tag-orange-border bg-ui-tag-orange-bg"
         : "border-ui-tag-blue-border bg-ui-tag-blue-bg"
   return (
-    <div className={`mt-6 rounded-md border px-4 py-3 ${cls}`} data-testid={`brief-banner-${tone}`}>
+    <div className={`my-4 rounded-md border px-4 py-3 ${cls}`} data-testid={`brief-banner-${tone}`}>
       <Text className="text-ui-fg-base">{children}</Text>
     </div>
   )
