@@ -5,6 +5,8 @@ import { useState, useTransition } from "react"
 
 import {
   saveBrief,
+  type BriefFile,
+  type BriefFx,
   type BriefOption,
   type BriefQuestion,
   type BriefStep,
@@ -39,11 +41,26 @@ const firstScreen = (b: BriefView): Screen => {
   return started ? "style" : "welcome"
 }
 
-export default function BriefTemplate({ brief: initial, token }: { brief: BriefView; token: string }) {
+const fxNote = (fx: BriefFx): string | null =>
+  fx.converted && fx.rate
+    ? `Shown in ${fx.display_currency.toUpperCase()}, converted from ${fx.base_currency.toUpperCase()} at today's rate. Workshops quote in ${fx.base_currency.toUpperCase()}, so the final figure moves with the exchange rate.`
+    : fx.reason
+
+export default function BriefTemplate({
+  brief: initial,
+  token,
+  countryCode,
+}: {
+  brief: BriefView
+  token: string
+  countryCode: string
+}) {
   const [brief, setBrief] = useState(initial)
   const [screen, setScreen] = useState<Screen>(() => firstScreen(initial))
   const [answers, setAnswers] = useState<Record<string, unknown>>(() =>
-    Object.fromEntries(initial.questions.map((q) => [q.key, q.answer ?? (q.kind === "multi_choice" ? [] : "")]))
+    Object.fromEntries(
+      initial.questions.map((q) => [q.key, q.answer ?? (q.kind === "multi_choice" || q.kind === "file" ? [] : "")])
+    )
   )
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set(initial.options.filter((o) => o.buyer_selected).map((o) => o.id))
@@ -64,7 +81,7 @@ export default function BriefTemplate({ brief: initial, token }: { brief: BriefV
     setError(null)
     startTransition(async () => {
       const cleaned = Object.fromEntries(Object.entries(answers).map(([k, v]) => [k, v === "" ? null : v]))
-      const res = await saveBrief(token, { answers: cleaned, selected_option_ids: Array.from(selected), ...extra })
+      const res = await saveBrief(token, countryCode, { answers: cleaned, selected_option_ids: Array.from(selected), ...extra })
       if (res.error || !res.brief) {
         setError(res.error ?? "Could not save. Please try again.")
         return
@@ -80,6 +97,14 @@ export default function BriefTemplate({ brief: initial, token }: { brief: BriefV
   }
 
   const chosen = brief.options.filter((o) => selected.has(o.id))
+  const fxLine = fxNote(brief.fx)
+  const onUploaded = (next: BriefView) => {
+    setBrief(next)
+    setAnswers((a) => ({
+      ...a,
+      ...Object.fromEntries(next.questions.filter((q) => q.kind === "file").map((q) => [q.key, q.answer ?? []])),
+    }))
+  }
   const stepIndex = STEPS.findIndex((s) => s.key === screen)
 
   return (
@@ -143,7 +168,8 @@ export default function BriefTemplate({ brief: initial, token }: { brief: BriefV
                     <StepPicker key={s.id} index={i} step={s} editable={editable && !pending} onPick={pickChoice} />
                   ))}
                 </ol>
-                <EstimateBox option={o} compact />
+                <StoryBox option={o} />
+                <EstimateBox option={o} compact fxLine={fxLine} />
               </>
             )}
           />
@@ -161,6 +187,7 @@ export default function BriefTemplate({ brief: initial, token }: { brief: BriefV
                 value={answers[q.key]}
                 disabled={!editable || pending}
                 onChange={(v) => setAnswers((a) => ({ ...a, [q.key]: v }))}
+                upload={{ token, countryCode, onUploaded }}
               />
             ))}
           </div>
@@ -171,7 +198,8 @@ export default function BriefTemplate({ brief: initial, token }: { brief: BriefV
       {screen === "review" && (
         <Panel title="Check and send" lead="Here's what we'll take to the workshops.">
           <Banner tone="estimate">{brief.estimate_disclaimer}</Banner>
-          <Summary brief={brief} chosen={chosen} />
+          {fxLine && <Text className="text-small-regular text-ui-fg-muted -mt-2">{fxLine}</Text>}
+          <Summary brief={brief} chosen={chosen} fxLine={fxLine} />
           <Nav
             pending={pending}
             back={() => go("details")}
@@ -296,6 +324,9 @@ function StyleCard({
         </span>
       </div>
       {option.description && <Text className="text-ui-fg-subtle mt-1">{option.description}</Text>}
+      {option.story.headline && (
+        <Text className="text-small-regular text-ui-fg-base mt-2 italic">“{option.story.headline}”</Text>
+      )}
       <div className="flex flex-wrap gap-1.5 mt-3">
         {option.steps.map((s) => (
           <span
@@ -399,7 +430,7 @@ function StepPicker({
   )
 }
 
-function EstimateBox({ option, compact = false }: { option: BriefOption; compact?: boolean }) {
+function EstimateBox({ option, compact = false, fxLine = null }: { option: BriefOption; compact?: boolean; fxLine?: string | null }) {
   const e = option.estimate
   return (
     <div className={`rounded-md bg-ui-bg-subtle p-4 ${compact ? "mt-4" : ""}`} data-testid="option-estimate">
@@ -422,11 +453,34 @@ function EstimateBox({ option, compact = false }: { option: BriefOption; compact
       )}
       {e.pending_steps.length > 0 && <Text className="text-ui-fg-subtle">Still to confirm: {e.pending_steps.join(", ")}</Text>}
       <Text className="text-ui-fg-muted text-small-regular mt-1">Freight and taxes not included.</Text>
+      {fxLine && <Text className="text-ui-fg-muted text-small-regular">{fxLine}</Text>}
     </div>
   )
 }
 
-function Summary({ brief, chosen }: { brief: BriefView; chosen: BriefOption[] }) {
+/** What she can tell HER customers: our line for the style, plus one factual line per craft. */
+function StoryBox({ option }: { option: BriefOption }) {
+  const { headline, points } = option.story
+  if (!headline && !points.length) return null
+  return (
+    <div className="mt-5 rounded-md border border-ui-border-base p-4" data-testid="option-story">
+      <Text className="text-small-regular text-ui-fg-muted uppercase tracking-wide">The story you can tell your customers</Text>
+      {headline && <Text className="text-base-regular text-ui-fg-base mt-1 italic">“{headline}”</Text>}
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {points.map((p) => (
+          <li key={p.label}>
+            <Text className="text-small-regular">
+              <span className="text-base-semi">{p.label}.</span> {p.text}
+              {p.by?.length ? <span className="text-ui-fg-subtle"> By {p.by.join(" or ")}.</span> : null}
+            </Text>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function Summary({ brief, chosen, fxLine = null }: { brief: BriefView; chosen: BriefOption[]; fxLine?: string | null }) {
   const answered = brief.questions.filter((q) => q.answer != null && !(Array.isArray(q.answer) && !q.answer.length))
   return (
     <div className="flex flex-col gap-6 mt-6" data-testid="brief-summary">
@@ -453,7 +507,8 @@ function Summary({ brief, chosen }: { brief: BriefView; chosen: BriefOption[] })
               )
             })}
           </ul>
-          <EstimateBox option={o} compact />
+          <StoryBox option={o} />
+          <EstimateBox option={o} compact fxLine={fxLine} />
         </>
         )}
       />
@@ -467,7 +522,11 @@ function Summary({ brief, chosen }: { brief: BriefView; chosen: BriefOption[] })
               <div key={q.id} className="contents">
                 <dt className="text-ui-fg-subtle">{q.label}</dt>
                 <dd className="text-ui-fg-base break-words">
-                  {Array.isArray(q.answer) ? q.answer.join(", ") : String(q.answer)}
+                  {q.kind === "file"
+                    ? (q.answer as BriefFile[]).map((f) => f.name).join(", ")
+                    : Array.isArray(q.answer)
+                      ? q.answer.join(", ")
+                      : String(q.answer)}
                 </dd>
               </div>
             ))}
@@ -531,7 +590,7 @@ function StatusView({ brief, chosen, onEdit }: { brief: BriefView; chosen: Brief
       <Heading level="h2" className="text-xl-semi mt-10 mb-2">
         What you asked for
       </Heading>
-      <Summary brief={brief} chosen={chosen} />
+      <Summary brief={brief} chosen={chosen} fxLine={fxNote(brief.fx)} />
 
       {onEdit ? (
         <div className="mt-6">
@@ -666,12 +725,17 @@ function QuestionField({
   value,
   disabled,
   onChange,
+  upload,
 }: {
   q: BriefQuestion
   value: unknown
   disabled: boolean
   onChange: (v: unknown) => void
+  upload: { token: string; countryCode: string; onUploaded: (b: BriefView) => void }
 }) {
+  if (q.kind === "file") {
+    return <FileField q={q} files={(Array.isArray(value) ? value : []) as BriefFile[]} disabled={disabled} onChange={onChange} upload={upload} />
+  }
   const id = `q-${q.key}`
   const input = "w-full rounded-md border border-ui-border-base bg-ui-bg-field px-3 py-2 text-base-regular disabled:opacity-70"
   const help = q.help ? <Text className="text-small-regular text-ui-fg-muted">{q.help}</Text> : null
@@ -735,6 +799,109 @@ function QuestionField({
           value={String(value ?? "")}
           onChange={(e) => onChange(q.kind === "number" && e.target.value !== "" ? Number(e.target.value) : e.target.value)}
         />
+      )}
+    </div>
+  )
+}
+
+/** Uploads go straight to the backend (via /api), one file at a time; removal is saved on Next. */
+function FileField({
+  q,
+  files,
+  disabled,
+  onChange,
+  upload,
+}: {
+  q: BriefQuestion
+  files: BriefFile[]
+  disabled: boolean
+  onChange: (v: unknown) => void
+  upload: { token: string; countryCode: string; onUploaded: (b: BriefView) => void }
+}) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  const send = async (list: FileList | null) => {
+    if (!list?.length) return
+    setErr(null)
+    for (const file of Array.from(list)) {
+      if (file.size > 10 * 1024 * 1024) {
+        setErr(`${file.name} is over 10 MB.`)
+        continue
+      }
+      setBusy(file.name)
+      const fd = new FormData()
+      fd.append("file", file)
+      fd.append("question_key", q.key)
+      fd.append("country", upload.countryCode)
+      try {
+        const res = await fetch(`/api/briefs/${encodeURIComponent(upload.token)}/files`, { method: "POST", body: fd })
+        const json = await res.json()
+        if (!res.ok || !json.brief) setErr(json.message || `Could not upload ${file.name}.`)
+        else upload.onUploaded(json.brief as BriefView)
+      } catch {
+        setErr(`Could not upload ${file.name}.`)
+      }
+    }
+    setBusy(null)
+  }
+
+  return (
+    <div className="flex flex-col gap-1" data-testid="brief-file-field">
+      <span className="text-base-semi">{q.label}</span>
+      {q.help && <Text className="text-small-regular text-ui-fg-muted">{q.help}</Text>}
+      <label
+        className={`mt-1 flex flex-col items-center justify-center rounded-md border-2 border-dashed border-ui-border-strong px-4 py-6 text-center ${
+          disabled || busy ? "opacity-60" : "cursor-pointer hover:border-ui-border-interactive"
+        }`}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={(e) => {
+          e.preventDefault()
+          if (!disabled && !busy) send(e.dataTransfer.files)
+        }}
+      >
+        <input
+          type="file"
+          className="hidden"
+          multiple
+          accept="image/*,application/pdf"
+          disabled={disabled || !!busy}
+          onChange={(e) => {
+            send(e.target.files)
+            e.target.value = ""
+          }}
+          data-testid="brief-file-input"
+        />
+        <Text className="text-ui-fg-base">{busy ? `Uploading ${busy}…` : "Drop files here or click to choose"}</Text>
+        <Text className="text-small-regular text-ui-fg-muted">Images or PDF, up to 10 MB each</Text>
+      </label>
+      {err && <Text className="text-small-regular text-ui-fg-error">{err}</Text>}
+      {files.length > 0 && (
+        <ul className="flex flex-wrap gap-2 mt-2" data-testid="brief-files">
+          {files.map((f) => (
+            <li key={f.url} className="flex items-center gap-2 rounded-md border border-ui-border-base p-2">
+              {f.type.startsWith("image/") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={f.url} alt="" className="h-10 w-10 object-cover rounded" />
+              ) : (
+                <span className="h-10 w-10 flex items-center justify-center rounded bg-ui-bg-subtle text-small-semi">PDF</span>
+              )}
+              <a href={f.url} target="_blank" rel="noreferrer" className="text-small-regular underline max-w-[12rem] truncate">
+                {f.name}
+              </a>
+              {!disabled && (
+                <button
+                  type="button"
+                  aria-label={`Remove ${f.name}`}
+                  className="text-ui-fg-muted hover:text-ui-fg-error px-1"
+                  onClick={() => onChange(files.filter((x) => x.url !== f.url))}
+                >
+                  ×
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

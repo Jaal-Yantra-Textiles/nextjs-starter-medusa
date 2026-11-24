@@ -20,8 +20,8 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function BriefPage({ params }: Props) {
-  const { token } = await params
-  const brief = await retrieveBrief(token)
+  const { token, countryCode } = await params
+  const brief = await retrieveBrief(token, countryCode)
   if (!brief) notFound()
-  return <BriefTemplate brief={brief} token={token} />
+  return <BriefTemplate brief={brief} token={token} countryCode={countryCode} />
 }

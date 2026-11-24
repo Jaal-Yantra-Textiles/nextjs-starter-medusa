@@ -54,6 +54,13 @@ export type BriefOptionEstimate = {
   skipped_currency: string[]
 }
 
+export type BriefOptionStory = {
+  /** Written by us for this style; may be null. */
+  headline: string | null
+  /** One factual line per craft step, and who makes it. */
+  points: { label: string; text: string; by: string[] | null }[]
+}
+
 export type BriefOption = {
   id: string
   title: string
@@ -61,6 +68,17 @@ export type BriefOption = {
   buyer_selected: boolean
   steps: BriefStep[]
   estimate: BriefOptionEstimate
+  story: BriefOptionStory
+}
+
+export type BriefFile = { url: string; name: string; type: string; size: number; uploaded_at: string }
+
+export type BriefFx = {
+  base_currency: string
+  display_currency: string
+  rate: number | null
+  converted: boolean
+  reason: string | null
 }
 
 export type BriefQuestion = {
@@ -68,7 +86,7 @@ export type BriefQuestion = {
   key: string
   label: string
   help: string | null
-  kind: "text" | "long_text" | "number" | "choice" | "multi_choice" | "date" | "boolean" | "link"
+  kind: "text" | "long_text" | "number" | "choice" | "multi_choice" | "date" | "boolean" | "link" | "file"
   options: string[] | null
   required: boolean
   answer: unknown
@@ -92,6 +110,7 @@ export type BriefView = {
   recipient_company: string | null
   destination_country_code: string
   currency_code: string
+  fx: BriefFx
   sample_quantity: number | null
   submitted_at: string | null
   expires_at: string | null
@@ -103,11 +122,12 @@ export type BriefView = {
   editable: boolean
 }
 
-export const retrieveBrief = async (token: string): Promise<BriefView | null> => {
+/** `country` is the page's /<country>/ segment: it picks the estimate currency. */
+export const retrieveBrief = async (token: string, country: string): Promise<BriefView | null> => {
   try {
     const { brief } = await sdk.client.fetch<{ brief: BriefView }>(
       `/store/b2b/briefs/${encodeURIComponent(token)}`,
-      { method: "GET", cache: "no-store" }
+      { method: "GET", query: { country }, cache: "no-store" }
     )
     return brief ?? null
   } catch (e: any) {
@@ -128,12 +148,13 @@ export type SaveBriefInput = {
 
 export const saveBrief = async (
   token: string,
+  country: string,
   input: SaveBriefInput
 ): Promise<{ brief: BriefView | null; error: string | null }> => {
   try {
     const { brief } = await sdk.client.fetch<{ brief: BriefView }>(
       `/store/b2b/briefs/${encodeURIComponent(token)}`,
-      { method: "POST", body: input, cache: "no-store" }
+      { method: "POST", body: input, query: { country }, cache: "no-store" }
     )
     return { brief, error: null }
   } catch (e: any) {
