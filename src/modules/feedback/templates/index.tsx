@@ -8,7 +8,7 @@ import LocalizedClientLink from "@modules/common/components/localized-client-lin
 
 /**
  * Post-delivery feedback: stars (required), an optional note, and — when the
- * backend offers some — an optional "which of these feels like you?" artwork
+ * backend offers some — an optional "which of these moods reflects you?" artwork
  * pick. States: the form, thank-you after sending, already answered.
  */
 const LABELS = ["Not happy", "Could be better", "It's okay", "Good", "Love it"]
@@ -345,7 +345,7 @@ export default function FeedbackTemplate({ view, feedbackId }: {
       </Section>
 
       {artworks.length > 0 && (
-        <Section step={2} title="Which of these feels most like you?" hint="Optional. Tap to choose, or open one to see it bigger.">
+        <Section step={2} title="Which of these moods reflects you?" hint="Optional. Tap the one that feels like you, or open it to see it bigger.">
           <div className="grid grid-cols-2 gap-3 small:grid-cols-3 small:gap-4">
             {artworks.map((a) => {
               const chosen = artworkId === a.id
