@@ -18,6 +18,8 @@ import {
 import { convertToLocale } from "@lib/util/money"
 import type { HttpTypes } from "@medusajs/types"
 
+import { DeliveryCheckNotice } from "@modules/checkout/components/delivery-check"
+
 import { useCheckoutGate } from "./checkout-gate"
 import {
   EMPTY_VALUES,
@@ -496,6 +498,11 @@ export default function SinglePageForm({
               inputMode: india ? "numeric" : "text",
             })}
           </div>
+          <DeliveryCheckNotice
+            countryCode={values.country_code}
+            postalCode={values.postal_code}
+            cartId={cart.id}
+          />
         </section>
       )}
 

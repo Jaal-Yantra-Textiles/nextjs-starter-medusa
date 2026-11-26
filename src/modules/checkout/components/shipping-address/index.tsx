@@ -6,6 +6,7 @@ import { mapKeys } from "lodash"
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import AddressSelect from "../address-select"
 import CountrySelect from "../country-select"
+import { DeliveryCheckNotice } from "../delivery-check"
 
 const ShippingAddress = ({
   customer,
@@ -220,6 +221,13 @@ const ShippingAddress = ({
           value={formData["shipping_address.province"]}
           onChange={handleChange}
           data-testid="shipping-province-input"
+        />
+      </div>
+      <div className="mt-3">
+        <DeliveryCheckNotice
+          countryCode={formData["shipping_address.country_code"] || ""}
+          postalCode={formData["shipping_address.postal_code"] || ""}
+          cartId={cart?.id}
         />
       </div>
       <div className="my-8">
