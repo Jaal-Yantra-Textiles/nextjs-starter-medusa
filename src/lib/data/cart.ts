@@ -719,6 +719,8 @@ export async function saveCheckoutDetails(
         contact_last_name: shipping.last_name,
         contact_phone: shipping.phone,
         has_different_recipient: false,
+        // Which checkout placed this order, to compare the two (A/B split).
+        checkout_variant: "single",
       },
     })
 

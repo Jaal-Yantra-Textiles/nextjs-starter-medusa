@@ -1,4 +1,6 @@
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
+
+import { CHECKOUT_VARIANT_COOKIE } from "@lib/util/checkout-split"
 
 import { requestHost } from "@lib/util/request-host"
 
@@ -8,6 +10,8 @@ import { requestHost } from "@lib/util/request-host"
  *
  * - `?checkout=single` / `?checkout=classic` on the URL always wins, so any
  *   store can be tried without a deploy.
+ * - Then the buyer's sticky random assignment (SINGLE_PAGE_CHECKOUT_PERCENT,
+ *   set by the proxy, see checkout-split.ts).
  * - Otherwise SINGLE_PAGE_CHECKOUT_HOSTS (server env) lists the store hosts
  *   that get it by default: comma-separated, `*` for all. Unset = nobody.
  */
@@ -19,6 +23,10 @@ export async function checkoutVariant(
   const q = searchParams.checkout
   const forced = Array.isArray(q) ? q[0] : q
   if (forced === "single" || forced === "classic") return forced
+
+  // Assigned by the proxy's random split (checkout-split.ts), sticky.
+  const assigned = (await cookies()).get(CHECKOUT_VARIANT_COOKIE)?.value
+  if (assigned === "single" || assigned === "classic") return assigned
 
   const list = (process.env.SINGLE_PAGE_CHECKOUT_HOSTS ?? "")
     .split(",")

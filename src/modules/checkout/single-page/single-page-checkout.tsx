@@ -105,7 +105,7 @@ export default async function SinglePageCheckout({
           >
             <h2 className="sr-only">Order summary</h2>
             <CheckoutItemList cart={cart} />
-            <DiscountCode cart={cart} />
+            <DiscountCode cart={cart as any} alwaysOpen />
             <CheckoutTotals cart={cart} />
             <QuoteCartNotice terms={quoteTerms ?? null} />
           </aside>
