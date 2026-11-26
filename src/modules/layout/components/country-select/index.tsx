@@ -57,8 +57,18 @@ const CountrySelect = ({ toggleState, regions }: CountrySelectProps) => {
     }
   }, [options, countryCode])
 
-  const handleChange = (option: CountryOption) => {
-    updateRegion(option.country, currentPath)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleChange = async (option: CountryOption) => {
+    setError(null)
+    // A design order's cart cannot change region (v2 #2646): updateRegion
+    // answers with the reason instead of redirecting. The button keeps
+    // showing `current`, which follows the URL, so it stays on this country.
+    const result = await updateRegion(option.country, currentPath)
+    if (result?.error) {
+      setError(result.error)
+      return
+    }
     close()
   }
 
@@ -92,6 +102,15 @@ const CountrySelect = ({ toggleState, regions }: CountrySelectProps) => {
             )}
           </div>
         </ListboxButton>
+        {error && (
+          <p
+            role="alert"
+            className="txt-compact-small text-rose-600 normal-case py-1"
+            data-testid="country-select-error"
+          >
+            {error}
+          </p>
+        )}
         <div className="flex relative w-full min-w-[320px]">
           <Transition
             show={state}

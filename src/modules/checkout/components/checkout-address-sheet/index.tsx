@@ -106,14 +106,22 @@ export default function CheckoutAddressSheet({
       setApplyingId(null)
       return
     }
-    setApplyingId(null)
-    onClose()
     if (
       address.country_code &&
       address.country_code !== shippingAddress?.country_code
     ) {
-      await updateRegion(address.country_code, pathname)
+      // A design order's cart cannot change region (v2 #2646): show why and
+      // keep the sheet open instead of moving the buyer to another country.
+      const moved = await updateRegion(address.country_code, pathname)
+      setApplyingId(null)
+      if (moved?.error) {
+        setError(moved.error)
+        return
+      }
+      onClose()
     } else {
+      setApplyingId(null)
+      onClose()
       router.refresh()
     }
   }
