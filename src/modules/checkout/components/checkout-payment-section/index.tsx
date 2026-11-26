@@ -32,6 +32,7 @@ import ErrorMessage from "@modules/checkout/components/error-message"
 import SkeletonCardDetails from "@modules/skeletons/components/skeleton-card-details"
 import CheckoutBillingSheet from "@modules/checkout/components/checkout-billing-sheet"
 import { StripeContext } from "../payment-wrapper/stripe-wrapper"
+import { useCheckoutGate } from "../../single-page/checkout-gate"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import { clx } from "@medusajs/ui"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -39,6 +40,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 interface CheckoutPaymentSectionProps {
   cart: HttpTypes.StoreCart
   availablePaymentMethods: { id: string }[]
+  /** Single-page checkout: billing is a field group in the form instead. */
+  hideBilling?: boolean
 }
 
 function providerSubLabel(id: string) {
@@ -54,6 +57,7 @@ function providerSubLabel(id: string) {
 export default function CheckoutPaymentSection({
   cart,
   availablePaymentMethods,
+  hideBilling = false,
 }: CheckoutPaymentSectionProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -273,7 +277,7 @@ export default function CheckoutPaymentSection({
       )}
 
       {/* Billing address */}
-      {billingSameAsShipping && !showBillingDetails ? (
+      {hideBilling ? null : billingSameAsShipping && !showBillingDetails ? (
         <label className="flex items-center gap-x-2 cursor-pointer">
           <input
             type="checkbox"
@@ -307,6 +311,7 @@ export default function CheckoutPaymentSection({
         </div>
       )}
 
+      {!hideBilling && (
       <CheckoutBillingSheet
         open={billingOpen}
         onClose={() => setBillingOpen(false)}
@@ -314,6 +319,7 @@ export default function CheckoutPaymentSection({
         onSaved={(sameAsShipping) => setShowBillingDetails(!sameAsShipping)}
         cart={cart}
       />
+      )}
 
       <ErrorMessage error={error} data-testid="payment-method-error-message" />
 
@@ -388,7 +394,10 @@ function StripeInlineFields({
   const [expressMethods, setExpressMethods] = useState<
     Record<string, boolean> | undefined | null
   >(null)
-  const showExpress = hasExpressMethods(expressMethods)
+  // Single-page checkout: wallets pay straight away and would skip the
+  // form's checks (no address, no email), so they stay hidden there for now.
+  const gate = useCheckoutGate()
+  const showExpress = !gate && hasExpressMethods(expressMethods)
 
   const returnUrl =
     typeof window !== "undefined"
