@@ -8,6 +8,7 @@ import { useElements, useStripe } from "@stripe/react-stripe-js"
 import React, { useContext, useState } from "react"
 import ErrorMessage from "../error-message"
 import { StripeContext } from "../payment-wrapper/stripe-wrapper"
+import { useCheckoutGate } from "../../single-page/checkout-gate"
 
 type PaymentButtonProps = {
   cart: HttpTypes.StoreCart
@@ -20,12 +21,16 @@ const PaymentButton: React.FC<PaymentButtonProps> = ({
   selectedPaymentMethod,
   "data-testid": dataTestId,
 }) => {
+  // Single-page checkout: the button stays clickable and the gate says what
+  // is missing (and saves), instead of a silent disabled button.
+  const gate = useCheckoutGate()
   const notReady =
-    !cart ||
+    !gate &&
+    (!cart ||
     !cart.shipping_address ||
     !cart.billing_address ||
     !cart.email ||
-    (cart.shipping_methods?.length ?? 0) < 1
+    (cart.shipping_methods?.length ?? 0) < 1)
 
   const paymentSession = cart.payment_collection?.payment_sessions?.[0]
 
@@ -83,7 +88,9 @@ const PayUPaymentButton = ({
     (s) => s.status === "pending"
   )
 
+  const gate = useCheckoutGate()
   const handlePayment = async () => {
+    if (gate?.run && !(await gate.run())) return
     setSubmitting(true)
     setErrorMessage(null)
 
@@ -190,7 +197,9 @@ const StripePaymentButton = ({
 
   const disabled = !stripe || !elements ? true : false
 
+  const gate = useCheckoutGate()
   const handlePayment = async () => {
+    if (gate?.run && !(await gate.run())) return
     setSubmitting(true)
 
     if (!stripe || !elements || !cart) {
@@ -269,7 +278,9 @@ const ManualTestPaymentButton = ({ notReady }: { notReady: boolean }) => {
       })
   }
 
-  const handlePayment = () => {
+  const gate = useCheckoutGate()
+  const handlePayment = async () => {
+    if (gate?.run && !(await gate.run())) return
     setSubmitting(true)
     onPaymentCompleted()
   }

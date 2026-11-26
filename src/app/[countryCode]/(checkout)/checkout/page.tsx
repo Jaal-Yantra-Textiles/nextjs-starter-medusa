@@ -6,6 +6,9 @@ import CheckoutForm from "@modules/checkout/templates/checkout-form"
 import CheckoutSummary from "@modules/checkout/templates/checkout-summary"
 import { Metadata } from "next"
 
+import { checkoutVariant } from "@lib/util/checkout-variant"
+import SinglePageCheckout from "@modules/checkout/single-page/single-page-checkout"
+
 import { notFound } from "next/navigation"
 
 export const metadata: Metadata = {
@@ -15,8 +18,10 @@ export const metadata: Metadata = {
 
 export default async function Checkout(props: {
   params: Promise<{ countryCode: string }>
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
   const { countryCode } = await props.params
+  const variant = await checkoutVariant(await props.searchParams)
   const cart = await retrieveCart()
 
   if (!cart) {
@@ -28,6 +33,21 @@ export default async function Checkout(props: {
     retrieveCustomer(),
     retrieveQuoteTerms(cart.id),
   ])
+
+  if (variant === "single") {
+    return (
+      <PaymentWrapper cart={cart}>
+        <CartUpdateProvider>
+          <SinglePageCheckout
+            cart={cart}
+            customer={customer}
+            countryCode={countryCode}
+            quoteTerms={quoteTerms}
+          />
+        </CartUpdateProvider>
+      </PaymentWrapper>
+    )
+  }
 
   return (
     <PaymentWrapper cart={cart}>

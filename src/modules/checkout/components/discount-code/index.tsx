@@ -14,10 +14,12 @@ type DiscountCodeProps = {
   cart: HttpTypes.StoreCart & {
     promotions: HttpTypes.StorePromotion[]
   }
+  /** Single-page checkout: the input is always there, no "Add" click. */
+  alwaysOpen?: boolean
 }
 
-const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
-  const [isOpen, setIsOpen] = React.useState(false)
+const DiscountCode: React.FC<DiscountCodeProps> = ({ cart, alwaysOpen = false }) => {
+  const [isOpen, setIsOpen] = React.useState(alwaysOpen)
   const [errorMessage, setErrorMessage] = React.useState("")
   const [isBusy, setIsBusy] = React.useState(false)
 
@@ -92,7 +94,18 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
   return (
     <div className="w-full flex flex-col rounded-rounded border border-ui-border-base bg-white p-4">
       <div className="txt-medium">
-        <form action={(a) => addPromotionCode(a)} className="w-full mb-5">
+        <form
+          action={(a) => addPromotionCode(a)}
+          className={alwaysOpen ? "w-full" : "w-full mb-5"}
+        >
+          {alwaysOpen ? (
+            <label
+              htmlFor="promotion-input"
+              className="block mb-2 txt-compact-small-plus text-ui-fg-base"
+            >
+              Discount code or gift card
+            </label>
+          ) : (
           <Label className="flex gap-x-1 my-2 items-center">
             <button
               onClick={() => setIsOpen(!isOpen)}
@@ -107,15 +120,18 @@ const DiscountCode: React.FC<DiscountCodeProps> = ({ cart }) => {
               <InformationCircleSolid color="var(--fg-muted)" />
             </Tooltip> */}
           </Label>
+          )}
 
           {isOpen && (
             <>
-              <div className="flex w-full gap-x-2">
+              <div className="flex w-full gap-x-2 [&>div:first-child]:flex-1">
                 <Input
-                  className="size-full"
+                  className="size-full w-full"
                   id="promotion-input"
                   name="code"
                   type="text"
+                  placeholder={alwaysOpen ? "Enter code" : undefined}
+                  autoComplete="off"
                   autoFocus={false}
                   disabled={isBusy}
                   data-testid="discount-input"

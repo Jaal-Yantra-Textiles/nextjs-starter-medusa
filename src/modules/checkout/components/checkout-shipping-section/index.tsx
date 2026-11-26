@@ -24,6 +24,13 @@ interface CheckoutShippingSectionProps {
     | null
   regions: HttpTypes.StoreRegion[]
   currentCountry: string
+  /**
+   * The single-page checkout asks for the country inside the address form,
+   * so it hides this dropdown (which changes region and redirects).
+   */
+  hideCountryPicker?: boolean
+  /** "rows": slim full-width rows (single-page checkout). Default: cards. */
+  layout?: "cards" | "rows"
 }
 
 function getLocalizedCountryName(
@@ -46,6 +53,8 @@ export default function CheckoutShippingSection({
   availableShippingOptions,
   regions,
   currentCountry,
+  hideCountryPicker = false,
+  layout = "cards",
 }: CheckoutShippingSectionProps) {
   const currentPath = usePathname()
   const [isPending, startTransition] = useTransition()
@@ -227,6 +236,7 @@ export default function CheckoutShippingSection({
           </p>
         </div>
 
+        {!hideCountryPicker && (
         <DropdownMenu>
           <DropdownMenu.Trigger
             className={clx(
@@ -262,15 +272,16 @@ export default function CheckoutShippingSection({
             </DropdownMenu.RadioGroup>
           </DropdownMenu.Content>
         </DropdownMenu>
+        )}
       </div>
 
       {/* Shipping method cards */}
-      <div className="overflow-x-auto no-scrollbar px-px pb-1">
+      <div className={layout === "rows" ? "px-px" : "overflow-x-auto no-scrollbar px-px pb-1"}>
         {shippingOptions && shippingOptions.length > 0 ? (
           <RadioGroup
             value={shippingMethodId ?? undefined}
             onValueChange={handleSelectShipping}
-            className="flex items-stretch gap-x-2"
+            className={layout === "rows" ? "flex flex-col gap-y-2" : "flex items-stretch gap-x-2"}
           >
             {shippingOptions.map((option) => {
               const isSelected = option.id === shippingMethodId
@@ -314,6 +325,64 @@ export default function CheckoutShippingSection({
                   : isLoadingPrices
                     ? null
                     : "—"
+
+              const radioDot = (
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+                  <div
+                    className={clx(
+                      "flex h-3.5 w-3.5 items-center justify-center rounded-full border bg-ui-bg-base shadow-borders-base",
+                      isSelected
+                        ? "border-ui-border-interactive bg-ui-bg-interactive shadow-borders-interactive-with-shadow"
+                        : "border-ui-border-base"
+                    )}
+                  >
+                    {isSelected && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-ui-bg-base shadow-details-contrast-on-bg-interactive" />
+                    )}
+                  </div>
+                </div>
+              )
+
+              if (layout === "rows") {
+                return (
+                  <div
+                    key={option.id}
+                    className={clx(
+                      "relative flex items-center gap-x-3 rounded-md border bg-ui-bg-base px-3 py-2.5 transition-colors hover:bg-ui-bg-base-hover",
+                      isSelected
+                        ? "border-ui-border-interactive"
+                        : "border-ui-border-base hover:border-ui-border-interactive/50"
+                    )}
+                    data-testid="delivery-option-radio"
+                  >
+                    <RadioGroup.Item
+                      value={option.id}
+                      aria-label={option.name}
+                      disabled={priceAmount === null && !isLoadingPrices}
+                      className="absolute inset-0 z-10 h-full w-full cursor-pointer rounded-md bg-transparent outline-none [&>div]:hidden focus-visible:shadow-borders-interactive-with-focus"
+                    />
+                    {radioDot}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="txt-compact-small-plus text-ui-fg-base break-words">
+                        {option.name}
+                      </span>
+                      {deliveryLabel && (
+                        <span className="txt-compact-xsmall text-ui-fg-subtle">
+                          {deliveryLabel}
+                        </span>
+                      )}
+                    </div>
+                    <span
+                      className={clx(
+                        "txt-compact-small-plus shrink-0",
+                        isFreeShipping ? "text-ui-tag-green-icon" : "text-ui-fg-base"
+                      )}
+                    >
+                      {price === null ? <Loader className="h-3 w-3 animate-spin" /> : price}
+                    </span>
+                  </div>
+                )
+              }
 
               return (
                 <div

@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { requestHost, requestOrigin } from "@lib/util/request-host"
 import {
+  CHECKOUT_VARIANT_COOKIE,
+  isCheckoutPath,
+  pickVariant,
+} from "@lib/util/checkout-split"
+import {
   ENV_PUBLISHABLE_KEY,
   IS_MULTI_TENANT,
   TENANT_PUBKEY_COOKIE,
@@ -346,7 +351,32 @@ export async function proxy(request: NextRequest) {
         `${existing ? existing + "; " : ""}_medusa_geo_unserved=${geoUnserved}`
       )
     }
+    // Checkout A/B: assign (or remember) classic vs single-page, and pass it
+    // to THIS render through the request cookie too.
+    let checkoutVariantToSet: string | null = null
+    if (isCheckoutPath(request.nextUrl.pathname)) {
+      const pick = pickVariant({
+        query: request.nextUrl.searchParams.get("checkout"),
+        cookie: request.cookies.get(CHECKOUT_VARIANT_COOKIE)?.value,
+        percent: Number(process.env.SINGLE_PAGE_CHECKOUT_PERCENT ?? 0),
+      })
+      if (pick.variant && pick.remember) {
+        checkoutVariantToSet = pick.variant
+        const existing = requestHeaders.get("cookie")
+        requestHeaders.set(
+          "cookie",
+          `${existing ? existing + "; " : ""}${CHECKOUT_VARIANT_COOKIE}=${pick.variant}`
+        )
+      }
+    }
     const nextResponse = NextResponse.next({ request: { headers: requestHeaders } })
+    if (checkoutVariantToSet) {
+      nextResponse.cookies.set(CHECKOUT_VARIANT_COOKIE, checkoutVariantToSet, {
+        maxAge: 60 * 60 * 24 * 30,
+        sameSite: "lax",
+        path: "/",
+      })
+    }
     if (!cacheIdCookie) {
       nextResponse.cookies.set("_medusa_cache_id", cacheId, {
         maxAge: 60 * 60 * 24,

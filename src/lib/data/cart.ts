@@ -647,3 +647,99 @@ export async function listCartOptions() {
     cache: "force-cache",
   })
 }
+
+export type CheckoutAddressInput = {
+  first_name: string
+  last_name: string
+  phone: string
+  address_1?: string
+  city?: string
+  postal_code?: string
+  province?: string
+  company?: string
+  country_code: string
+}
+
+export type SaveCheckoutDetailsInput = {
+  email: string
+  shipping_address: CheckoutAddressInput
+  /** `null` = same as shipping. */
+  billing_address: CheckoutAddressInput | null
+  /** Region the chosen country belongs to; changed first when it differs. */
+  region_id?: string
+}
+
+/**
+ * Single-page checkout (#2636 follow-up): everything the buyer typed goes to
+ * the cart in ONE address write, instead of one modal per field group.
+ *
+ * A region change is sent on its own first: Medusa replaces the shipping
+ * address with just the country when the region changes in the same update
+ * (core-flows update-cart), which would drop the address the buyer typed.
+ * No redirect here; the caller moves the URL to the new country.
+ */
+export async function saveCheckoutDetails(
+  input: SaveCheckoutDetailsInput
+): Promise<
+  | { ok: true; total: number; currency_code: string; region_changed: boolean }
+  | { ok: false; error: string }
+> {
+  try {
+    const cartId = await getCartId()
+    if (!cartId) throw new Error("No cart found")
+    const current = await retrieveCart(cartId, "id,region_id,metadata,total,currency_code")
+    if (!current) throw new Error("No cart found")
+
+    const regionChanged =
+      !!input.region_id && input.region_id !== current.region_id
+    if (regionChanged) {
+      const moved = await updateCart({ region_id: input.region_id })
+      // A 200 that kept the old region (an item with no price there).
+      if (moved?.region_id !== input.region_id) {
+        return {
+          ok: false,
+          error:
+            "Some items in your bag can't be sent to that country. Choose another country, or remove them.",
+        }
+      }
+    }
+
+    const shipping = clean(input.shipping_address)
+    const billing = input.billing_address
+      ? clean({ ...input.billing_address, country_code: shipping.country_code })
+      : shipping
+
+    const cart = await updateCart({
+      email: input.email.trim(),
+      shipping_address: shipping,
+      billing_address: billing,
+      metadata: {
+        ...((current.metadata as Record<string, unknown>) ?? {}),
+        contact_first_name: shipping.first_name,
+        contact_last_name: shipping.last_name,
+        contact_phone: shipping.phone,
+        has_different_recipient: false,
+        // Which checkout placed this order, to compare the two (A/B split).
+        checkout_variant: "single",
+      },
+    })
+
+    return {
+      ok: true,
+      total: cart.total,
+      currency_code: cart.currency_code,
+      region_changed: regionChanged,
+    }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "Could not save your details" }
+  }
+}
+
+function clean(a: CheckoutAddressInput) {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(a)) {
+    const t = typeof v === "string" ? v.trim() : v
+    if (t) out[k] = t as string
+  }
+  return out as unknown as CheckoutAddressInput
+}
