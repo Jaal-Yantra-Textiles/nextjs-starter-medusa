@@ -44,7 +44,7 @@ export const paymentInfoMap: Record<
   },
   pp_system_default: {
     // Only ever offered on an in-person pickup (see checkout-summary).
-    title: "Pay in cash at pickup",
+    title: "Cash on delivery",
     icon: <CreditCard />,
   },
   pp_payu_payu: {
