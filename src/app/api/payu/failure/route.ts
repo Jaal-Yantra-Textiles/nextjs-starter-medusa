@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sdk } from "@lib/config"
+import { requestOrigin } from "@lib/util/request-host"
 
 import { cookies as nextCookies } from "next/headers"
 
@@ -42,7 +43,8 @@ export async function POST(request: NextRequest) {
   return NextResponse.redirect(
     new URL(
       `/${countryCode}/checkout/payment-failed?${params.toString()}`,
-      request.url
+      // The buyer's domain, not the upstream we were proxied to (#2636).
+      requestOrigin(request.headers, request.url)
     )
   )
 }
