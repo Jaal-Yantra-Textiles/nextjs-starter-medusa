@@ -56,6 +56,7 @@ export default function CheckoutShippingSection({
     Record<string, number>
   >({})
   const [shippingError, setShippingError] = useState<string | null>(null)
+  const [regionError, setRegionError] = useState<string | null>(null)
   const [shippingMethodId, setShippingMethodId] = useState<string | null>(
     cart.shipping_methods?.at(-1)?.shipping_option_id || null
   )
@@ -130,8 +131,14 @@ export default function CheckoutShippingSection({
       return
     }
 
-    startTransition(() => {
-      updateRegion(option.country, currentPath)
+    setRegionError(null)
+    startTransition(async () => {
+      // A design order's cart cannot change region (v2 #2646). The select is
+      // driven by `currentCountry`, so on a refusal it stays where it was.
+      const result = await updateRegion(option.country, currentPath)
+      if (result?.error) {
+        setRegionError(result.error)
+      }
     })
   }
 
@@ -263,6 +270,16 @@ export default function CheckoutShippingSection({
           </DropdownMenu.Content>
         </DropdownMenu>
       </div>
+
+      {regionError && (
+        <p
+          role="alert"
+          className="txt-compact-small text-rose-500"
+          data-testid="checkout-country-error"
+        >
+          {regionError}
+        </p>
+      )}
 
       {/* Shipping method cards */}
       <div className="overflow-x-auto no-scrollbar px-px pb-1">

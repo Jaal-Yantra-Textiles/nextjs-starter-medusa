@@ -2,6 +2,10 @@
 
 import { sdk } from "@lib/config"
 import medusaError from "@lib/util/medusa-error"
+import {
+  designOrderRegionLockMessage,
+  isDesignOrderCart,
+} from "@lib/util/design-order-cart"
 import { HttpTypes } from "@medusajs/types"
 import { updateTag } from "next/cache"
 import { redirect } from "next/navigation"
@@ -92,6 +96,15 @@ const isQuoteBoundCart = (cart?: { metadata?: Record<string, unknown> | null } |
   Boolean(cart?.metadata?.quote_id)
 
 /**
+ * Carts that must stay in the region they were made in: quote carts (above)
+ * and design orders (v2 #2646 — a region change deletes every custom-priced
+ * line, which on a design order is every line).
+ */
+const isRegionLockedCart = (
+  cart?: { metadata?: Record<string, unknown> | null } | null
+) => isQuoteBoundCart(cart) || isDesignOrderCart(cart)
+
+/**
  * The quote terms behind a cart, or null (#1787).
  *
  * 🔴 Never computes a deposit here. The backend derives it with the same
@@ -139,8 +152,8 @@ export async function getOrSetCart(countryCode: string) {
     throw new Error(`Region not found for country code: ${countryCode}`)
   }
 
-  // `metadata` is fetched for the quote-cart guard below — without it the
-  // marker reads `undefined` on every cart and the guard is dead code.
+  // `metadata` is fetched for the region-lock guard below — without it the
+  // markers read `undefined` on every cart and the guard is dead code.
   let cart = await retrieveCart(undefined, "id,region_id,metadata")
 
   const headers = {
@@ -162,7 +175,7 @@ export async function getOrSetCart(countryCode: string) {
     updateTag(cartCacheTag)
   }
 
-  if (cart && cart?.region_id !== region.id && !isQuoteBoundCart(cart)) {
+  if (cart && cart?.region_id !== region.id && !isRegionLockedCart(cart)) {
     await sdk.store.cart.update(cart.id, { region_id: region.id }, {}, headers)
     const cartCacheTag = await getCacheTag("carts")
     updateTag(cartCacheTag)
@@ -596,8 +609,15 @@ export async function placeOrder(cartId?: string) {
  * Updates the countrycode param and revalidates the regions cache
  * @param regionId
  * @param countryCode
+ *
+ * Returns `{ error }` and does NOT redirect when the cart is a design order
+ * and the country belongs to another region (v2 #2646): the buyer stays on the
+ * country they are on and is shown the message.
  */
-export async function updateRegion(countryCode: string, currentPath: string) {
+export async function updateRegion(
+  countryCode: string,
+  currentPath: string
+): Promise<{ error: string } | void> {
   const cartId = await getCartId()
   const region = await getRegion(countryCode)
 
@@ -611,7 +631,15 @@ export async function updateRegion(countryCode: string, currentPath: string) {
     // on that cart were agreed, not browsed. The buyer still gets the locale
     // they asked for; the quote they accepted simply does not follow them into
     // it. See `isQuoteBoundCart`.
-    const cart = await retrieveCart(cartId, "id,region_id,metadata")
+    const cart = await retrieveCart(cartId, "id,region_id,currency_code,metadata")
+
+    // v2 #2646 — unlike a quote cart, a design order does not let the
+    // storefront move either: it is priced in one currency, and another
+    // country's checkout around it would offer delivery we have not priced.
+    // Refuse and say why; the backend refuses the region change as well.
+    if (cart && cart.region_id !== region.id && isDesignOrderCart(cart)) {
+      return { error: designOrderRegionLockMessage(cart.currency_code) }
+    }
 
     if (!isQuoteBoundCart(cart)) {
       await updateCart({ region_id: region.id })
