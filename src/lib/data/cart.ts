@@ -720,6 +720,13 @@ export async function saveCheckoutDetails(
 
     const regionChanged =
       !!input.region_id && input.region_id !== current.region_id
+    // v2 #2646: a region change deletes every line of a design order.
+    if (regionChanged && isDesignOrderCart(current)) {
+      return {
+        ok: false,
+        error: designOrderRegionLockMessage(current.currency_code),
+      }
+    }
     if (regionChanged) {
       const moved = await updateCart({ region_id: input.region_id })
       // A 200 that kept the old region (an item with no price there).

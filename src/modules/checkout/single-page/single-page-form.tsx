@@ -11,6 +11,10 @@ import {
 } from "react"
 
 import { saveCheckoutDetails, updateCart } from "@lib/data/cart"
+import {
+  designOrderRegionLockMessage,
+  isDesignOrderCart,
+} from "@lib/util/design-order-cart"
 import { convertToLocale } from "@lib/util/money"
 import type { HttpTypes } from "@medusajs/types"
 
@@ -257,6 +261,16 @@ export default function SinglePageForm({
     setValues(next)
     valuesRef.current = next
     const region = countries.find((c) => c.iso === iso)?.region_id
+    if (region && region !== cart.region_id && isDesignOrderCart(cart)) {
+      // v2 #2646: a region change deletes every line of a design order. Keep
+      // the country it was priced for and say why. (The backend refuses with
+      // the same words, which the catch below would show if this missed.)
+      const back = { ...valuesRef.current, country_code: previous }
+      setValues(back)
+      valuesRef.current = back
+      setCountryNotice(designOrderRegionLockMessage(cart.currency_code))
+      return
+    }
     if (region && region !== cart.region_id) {
       // Prices, taxes and delivery options all follow the region; change it
       // now (no page reload) and re-save the address right after.
