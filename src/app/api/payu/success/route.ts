@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sdk } from "@lib/config"
+import { requestOrigin } from "@lib/util/request-host"
 
 import { cookies as nextCookies } from "next/headers"
 
@@ -8,7 +9,7 @@ function failedRedirect(
   countryCode: string,
   error: string,
   cartId: string | null,
-  requestUrl: string
+  origin: string
 ) {
   const params = new URLSearchParams()
   params.set("error", error)
@@ -16,12 +17,14 @@ function failedRedirect(
   return NextResponse.redirect(
     new URL(
       `/${countryCode}/checkout/payment-failed?${params.toString()}`,
-      requestUrl
+      origin
     )
   )
 }
 
 export async function POST(request: NextRequest) {
+  // Redirect to the buyer's domain, not the upstream we were proxied to (#2636).
+  const origin = requestOrigin(request.headers, request.url)
   const formData = await request.formData()
   const cartId = request.nextUrl.searchParams.get("cart_id")
 
@@ -35,11 +38,11 @@ export async function POST(request: NextRequest) {
   const countryCode = cookies.get("_medusa_country_code")?.value || "in"
 
   if (!cartId) {
-    return failedRedirect(countryCode, "Missing cart reference", null, request.url)
+    return failedRedirect(countryCode, "Missing cart reference", null, origin)
   }
 
   if (status !== "success") {
-    return failedRedirect(countryCode, "Payment was not successful", cartId, request.url)
+    return failedRedirect(countryCode, "Payment was not successful", cartId, origin)
   }
 
   try {
@@ -62,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (result.type === "order" && result.order_id) {
       cookies.set("_medusa_cart_id", "", { maxAge: -1 })
       return NextResponse.redirect(
-        new URL(`/${countryCode}/order/${result.order_id}/confirmed`, request.url)
+        new URL(`/${countryCode}/order/${result.order_id}/confirmed`, origin)
       )
     }
 
@@ -70,7 +73,7 @@ export async function POST(request: NextRequest) {
       countryCode,
       result.error || "Payment could not be authorized",
       cartId,
-      request.url
+      origin
     )
   } catch (error: any) {
     console.error("[PayU Success] Error:", error?.message || error)
@@ -78,7 +81,7 @@ export async function POST(request: NextRequest) {
       countryCode,
       "Something went wrong completing your order",
       cartId,
-      request.url
+      origin
     )
   }
 }

@@ -3,6 +3,7 @@
 import { headers } from "next/headers"
 import { sdk } from "@lib/config"
 import { getCacheOptions } from "./cookies"
+import { requestHost } from "@lib/util/request-host"
 
 export type AnimationType =
   | "none"
@@ -242,7 +243,8 @@ export type PublicWebsitePage = {
  */
 export async function getStorefrontDomain(): Promise<string> {
   const hdrs = await headers()
-  const host = hdrs.get("host") || hdrs.get("x-forwarded-host") || "localhost:8000"
+  // The buyer's domain, not the upstream's (#2636).
+  const host = requestHost(hdrs) || "localhost:8000"
   // Strip port for local dev
   return host.replace(/:\d+$/, "")
 }

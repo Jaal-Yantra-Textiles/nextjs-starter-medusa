@@ -1,5 +1,7 @@
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
+
+import { requestHost, requestOrigin } from "@lib/util/request-host"
 import {
   ENV_PUBLISHABLE_KEY,
   IS_MULTI_TENANT,
@@ -67,7 +69,8 @@ const tenantCache = new Map<
 >()
 
 function getHost(request: NextRequest): string {
-  return (request.headers.get("host") || "").toLowerCase().split(":")[0].trim()
+  // The buyer's domain, not the upstream's — see request-host.ts (#2636).
+  return requestHost(request.headers).split(":")[0]
 }
 
 // Geo country from either platform: Vercel (`x-vercel-ip-country`) or
@@ -364,7 +367,7 @@ export async function middleware(request: NextRequest) {
 
   // If no country code is set, we redirect to the relevant region.
   if (!urlHasCountryCode && countryCode) {
-    redirectUrl = `${request.nextUrl.origin}/${countryCode}${redirectPath}${queryString}`
+    redirectUrl = `${requestOrigin(request.headers, request.url)}/${countryCode}${redirectPath}${queryString}`
     response = NextResponse.redirect(`${redirectUrl}`, 307)
   } else if (!urlHasCountryCode && !countryCode) {
     // Handle case where no valid country code exists (empty regions)

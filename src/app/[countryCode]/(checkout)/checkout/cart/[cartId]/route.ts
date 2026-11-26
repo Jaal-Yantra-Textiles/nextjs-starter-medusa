@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
 
 import { retrieveCart } from "@lib/data/cart"
+import { requestOrigin } from "@lib/util/request-host"
 
 /**
  * Adopt a cart named in the URL and hand the buyer to checkout (#1787).
@@ -98,6 +99,10 @@ export async function GET(
   }
 
   return NextResponse.redirect(
-    new URL(`/${checkoutCountry}/checkout?step=address`, request.url)
+    new URL(
+      `/${checkoutCountry}/checkout?step=address`,
+      // The buyer's domain, not the upstream we were proxied to (#2636).
+      requestOrigin(request.headers, request.url)
+    )
   )
 }

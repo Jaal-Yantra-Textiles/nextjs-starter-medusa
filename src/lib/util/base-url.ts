@@ -2,6 +2,7 @@ import { headers } from "next/headers"
 
 import { getBaseURL } from "@lib/util/env"
 import { IS_MULTI_TENANT } from "@lib/util/get-request-pubkey"
+import { requestHost, requestOrigin } from "@lib/util/request-host"
 
 /**
  * Request-aware base URL for every absolute URL we emit for SEO — canonicals,
@@ -29,17 +30,10 @@ export async function getRequestBaseURL(): Promise<string> {
 
   try {
     const h = await headers()
-    // Match the middleware's tenant-resolution signal: `host` first, then the
-    // forwarded header (first hop if a proxy chained several).
-    const raw =
-      h.get("host") || h.get("x-forwarded-host")?.split(",")[0].trim()
-
-    if (raw) {
-      const isLocal = /^(localhost|127\.0\.0\.1)/.test(raw)
-      const proto = h.get("x-forwarded-proto") || (isLocal ? "http" : "https")
-      // Keep the port only for local dev (http); public https hosts never carry one.
-      const host = proto === "https" ? raw.replace(/:\d+$/, "") : raw
-      return `${proto}://${host}`
+    // Same signal the middleware resolves the tenant from: the forwarded
+    // (buyer's) host first, then `host` (#2636).
+    if (requestHost(h)) {
+      return requestOrigin(h)
     }
   } catch {
     // `headers()` unavailable (e.g. a fully static render) — fall back to env.
