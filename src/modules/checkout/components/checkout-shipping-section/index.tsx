@@ -10,6 +10,7 @@ import { Loader, CursorDefault } from "@medusajs/icons"
 import { DropdownMenu, RadioGroup, clx } from "@medusajs/ui"
 import type { HttpTypes } from "@medusajs/types"
 import { usePathname } from "next/navigation"
+import { DeliveryCheckSummary } from "@modules/checkout/components/delivery-check"
 
 type CountryOption = {
   country: string
@@ -241,6 +242,9 @@ export default function CheckoutShippingSection({
           <p className="txt-compact-medium text-ui-fg-muted">
             Select how you would like your order delivered
           </p>
+          <div className="mt-3">
+            <DeliveryCheckSummary />
+          </div>
         </div>
 
         {!hideCountryPicker && (

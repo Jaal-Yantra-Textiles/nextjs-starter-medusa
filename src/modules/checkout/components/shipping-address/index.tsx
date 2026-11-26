@@ -223,13 +223,11 @@ const ShippingAddress = ({
           data-testid="shipping-province-input"
         />
       </div>
-      <div className="mt-3">
-        <DeliveryCheckNotice
-          countryCode={formData["shipping_address.country_code"] || ""}
-          postalCode={formData["shipping_address.postal_code"] || ""}
-          cartId={cart?.id}
-        />
-      </div>
+      <DeliveryCheckNotice
+        countryCode={formData["shipping_address.country_code"] || ""}
+        postalCode={formData["shipping_address.postal_code"] || ""}
+        cartId={cart?.id}
+      />
       <div className="my-8">
         <Checkbox
           label="Billing address same as shipping address"

@@ -18,22 +18,26 @@ import {
 
 /**
  * The checkout's delivery check: runs on its own when the buyer types or
- * changes the shipping PIN / postcode (debounced, no button), shows the
- * answer under the field, and shares it with the payment section so cash on
- * delivery is dropped when the address can't take it.
+ * changes the shipping PIN / postcode (debounced, no button). The answer is
+ * shown in the DELIVERY section (founder, 2026-11-27), next to the delivery
+ * options, and shared with the payment section so cash on delivery is dropped
+ * when the address can't take it.
  */
 
 type Ctx = {
   result: DeliveryCheckResult | null
+  loading: boolean
   setResult: (r: DeliveryCheckResult | null) => void
+  setLoading: (l: boolean) => void
 }
 
 const DeliveryCheckCtx = createContext<Ctx | null>(null)
 
 export function DeliveryCheckProvider({ children }: { children: ReactNode }) {
   const [result, setResult] = useState<DeliveryCheckResult | null>(null)
+  const [loading, setLoading] = useState(false)
   return (
-    <DeliveryCheckCtx.Provider value={{ result, setResult }}>
+    <DeliveryCheckCtx.Provider value={{ result, loading, setResult, setLoading }}>
       {children}
     </DeliveryCheckCtx.Provider>
   )
@@ -131,8 +135,9 @@ export function DeliveryCheckResultView({
 }
 
 /**
- * Drop-in under a shipping postcode field. Publishes its answer to the
- * provider (if any) and clears it on unmount, so switching to pickup (which
+ * Runs the check for the shipping address being typed and publishes the answer
+ * to the provider. Renders nothing: the answer shows in the Delivery section
+ * (DeliveryCheckSummary). Clears on unmount, so switching to pickup (which
  * hides the address) doesn't leave a stale "no COD" behind.
  */
 export function DeliveryCheckNotice({
@@ -144,14 +149,75 @@ export function DeliveryCheckNotice({
   postalCode: string
   cartId?: string
 }) {
+  usePublishedDeliveryCheck(countryCode, postalCode, cartId)
+  return null
+}
+
+function usePublishedDeliveryCheck(countryCode: string, postalCode: string, cartId?: string) {
   const ctx = useContext(DeliveryCheckCtx)
   const { result, loading } = useDeliveryCheck(countryCode, postalCode, { cartId })
   const setShared = ctx?.setResult
+  const setSharedLoading = ctx?.setLoading
 
   useEffect(() => {
     setShared?.(loading ? null : result)
-  }, [result, loading, setShared])
-  useEffect(() => () => setShared?.(null), [setShared])
+    setSharedLoading?.(loading)
+  }, [result, loading, setShared, setSharedLoading])
+  useEffect(
+    () => () => {
+      setShared?.(null)
+      setSharedLoading?.(false)
+    },
+    [setShared, setSharedLoading]
+  )
+  return { result, loading }
+}
 
-  return <DeliveryCheckResultView result={result} loading={loading} />
+/**
+ * The answer, shown in the Delivery section above the delivery options.
+ *
+ * Single-page checkout: reads what the address field's check published.
+ * Classic checkout: the address step has closed by the time Delivery opens, so
+ * pass the SAVED shipping address and it runs (and publishes) the check itself.
+ */
+export function DeliveryCheckSummary({
+  countryCode,
+  postalCode,
+  cartId,
+}: {
+  countryCode?: string
+  postalCode?: string
+  cartId?: string
+} = {}) {
+  if (countryCode !== undefined && postalCode !== undefined) {
+    return <OwnDeliveryCheck countryCode={countryCode} postalCode={postalCode} cartId={cartId} />
+  }
+  return <SharedDeliveryCheck />
+}
+
+function SharedDeliveryCheck() {
+  const ctx = useContext(DeliveryCheckCtx)
+  return <SummaryBox result={ctx?.result ?? null} loading={ctx?.loading ?? false} />
+}
+
+function OwnDeliveryCheck({ countryCode, postalCode, cartId }: {
+  countryCode: string
+  postalCode: string
+  cartId?: string
+}) {
+  const { result, loading } = usePublishedDeliveryCheck(countryCode, postalCode, cartId)
+  return <SummaryBox result={result} loading={loading} />
+}
+
+function SummaryBox({ result, loading }: { result: DeliveryCheckResult | null; loading: boolean }) {
+  if (!loading && !result) return null
+  const border =
+    !loading && result?.serviceable === false
+      ? "border-ui-border-error bg-ui-bg-subtle"
+      : "border-ui-border-base bg-ui-bg-subtle"
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${border}`} data-testid="delivery-check-summary">
+      <DeliveryCheckResultView result={result} loading={loading} />
+    </div>
+  )
 }
