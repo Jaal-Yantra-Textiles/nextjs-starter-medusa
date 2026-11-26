@@ -22,7 +22,7 @@ const RATING_NUMBER: Record<FeedbackRating, number> = {
 
 const Card = ({ children }: { children: React.ReactNode }) => (
   <div className="content-container flex min-h-[60vh] items-center justify-center py-16">
-    <div className="w-full max-w-2xl rounded-2xl border border-ui-border-base bg-ui-bg-base p-5 shadow-elevation-card-rest small:p-10">
+    <div className="w-full max-w-2xl px-1 small:px-0">
       {children}
     </div>
   </div>
