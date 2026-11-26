@@ -55,7 +55,10 @@ export async function POST(req: NextRequest) {
     : []
 
   for (const t of tags) {
-    revalidateTag(t)
+    // Expire now, not stale-while-revalidate (Next 16's "max" profile would
+    // serve the pre-edit page once more): a partner who saves and reloads
+    // must see their change (#2636).
+    revalidateTag(t, { expire: 0 })
   }
   for (const p of paths) {
     revalidatePath(p, "layout")

@@ -237,7 +237,7 @@ async function getCountryCode(
 /**
  * Middleware to handle region selection and (multi-tenant) Host resolution.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Skip redirect loop for visual/theme editor iframes (cross-origin cookie issue)
   const isEditorMode =
     request.nextUrl.searchParams.get("visual_editor") === "true" ||
