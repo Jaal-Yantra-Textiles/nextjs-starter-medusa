@@ -12,6 +12,7 @@ import Divider from "@modules/common/components/divider"
 import MedusaRadio from "@modules/common/components/radio"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import { DeliveryCheckSummary } from "../delivery-check"
 
 const PICKUP_OPTION_ON = "__PICKUP_ON"
 const PICKUP_OPTION_OFF = "__PICKUP_OFF"
@@ -233,6 +234,15 @@ const Shipping: React.FC<ShippingProps> = ({
               <span className="mb-4 text-ui-fg-muted txt-medium">
                 How would you like you order delivered
               </span>
+              {cart.shipping_address?.postal_code ? (
+                <div className="mb-4">
+                  <DeliveryCheckSummary
+                    countryCode={cart.shipping_address.country_code || ""}
+                    postalCode={cart.shipping_address.postal_code || ""}
+                    cartId={cart.id}
+                  />
+                </div>
+              ) : null}
             </div>
             <div data-testid="delivery-options-container">
               <div className="pb-8 md:pt-0 pt-2">

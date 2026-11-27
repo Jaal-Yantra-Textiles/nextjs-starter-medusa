@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 
 import ImageGallery from "@modules/products/components/image-gallery"
+import DeliveryCheckBox from "@modules/products/components/delivery-check-box"
 import ProductActions from "@modules/products/components/product-actions"
 import ProductOnboardingCta from "@modules/products/components/product-onboarding-cta"
 import ProductTabs from "@modules/products/components/product-tabs"
@@ -166,6 +167,14 @@ const ProductTemplate = async ({
           >
             <ProductActionsWrapper id={product.id} region={region} ctaText={pt?.cta_text} />
           </Suspense>
+          {/* Off by default — see DeliveryCheckBox. */}
+          {process.env.NEXT_PUBLIC_PRODUCT_DELIVERY_CHECK === "1" && (
+            <DeliveryCheckBox
+              countryCode={countryCode}
+              countries={(region.countries ?? []).map((c) => c.iso_2 ?? "").filter(Boolean)}
+              variantId={product.variants?.[0]?.id}
+            />
+          )}
         </div>
       </div>
       {/* "Made to" used to sit in the buying column, where a two-column

@@ -10,6 +10,7 @@ import CheckoutItemList from "@modules/checkout/components/checkout-item-list"
 import CheckoutPaymentSection from "@modules/checkout/components/checkout-payment-section"
 import CheckoutShippingSection from "@modules/checkout/components/checkout-shipping-section"
 import CheckoutTotals from "@modules/checkout/components/checkout-totals"
+import { DeliveryCheckProvider } from "@modules/checkout/components/delivery-check"
 import DiscountCode from "@modules/checkout/components/discount-code"
 import SignInPrompt from "@modules/checkout/components/sign-in-prompt"
 import type { QuoteCartTerms } from "types/quote-terms"
@@ -73,6 +74,7 @@ export default async function SinglePageCheckout({
 
   return (
     <CheckoutGateProvider>
+      <DeliveryCheckProvider>
       <div className="overflow-x-hidden">
         <div className="lg:content-container flex flex-col-reverse lg:grid lg:grid-cols-[7fr_5fr] min-h-screen">
           <div className="flex flex-col gap-y-6 px-4 py-6 lg:pe-10 lg:py-10 lg:ps-0">
@@ -111,6 +113,7 @@ export default async function SinglePageCheckout({
           </aside>
         </div>
       </div>
+      </DeliveryCheckProvider>
     </CheckoutGateProvider>
   )
 }

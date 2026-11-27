@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef, useContext } from "react"
+import { filterCodForDelivery } from "@lib/util/delivery-check"
+import { useDeliveryCheckResult } from "@modules/checkout/components/delivery-check"
+import { useState, useEffect, useRef, useContext, useMemo } from "react"
 import { initiatePaymentSession, placeOrder } from "@lib/data/cart"
 import {
   buildPaymentSessionData,
@@ -56,9 +58,16 @@ function providerSubLabel(id: string) {
 
 export default function CheckoutPaymentSection({
   cart,
-  availablePaymentMethods,
+  availablePaymentMethods: offeredMethods,
   hideBilling = false,
 }: CheckoutPaymentSectionProps) {
+  // The delivery check under the shipping postcode can rule cash on delivery
+  // out for that address. Only a definite "no" removes it.
+  const deliveryCheck = useDeliveryCheckResult()
+  const availablePaymentMethods = useMemo(
+    () => filterCodForDelivery(offeredMethods, deliveryCheck),
+    [offeredMethods, deliveryCheck]
+  )
   const router = useRouter()
   const searchParams = useSearchParams()
   const latestSession = cart.payment_collection?.payment_sessions?.[0]

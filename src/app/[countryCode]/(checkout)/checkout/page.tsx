@@ -1,5 +1,6 @@
 import { retrieveCart, retrieveQuoteTerms } from "@lib/data/cart"
 import { retrieveCustomer } from "@lib/data/customer"
+import { DeliveryCheckProvider } from "@modules/checkout/components/delivery-check"
 import PaymentWrapper from "@modules/checkout/components/payment-wrapper"
 import { CartUpdateProvider } from "@modules/checkout/context/cart-update-context"
 import CheckoutForm from "@modules/checkout/templates/checkout-form"
@@ -52,6 +53,7 @@ export default async function Checkout(props: {
   return (
     <PaymentWrapper cart={cart}>
       <CartUpdateProvider>
+        <DeliveryCheckProvider>
         <div className="overflow-x-hidden">
           <div className="lg:content-container flex flex-col lg:grid lg:grid-cols-[7fr_5fr] min-h-screen">
             <CheckoutForm
@@ -62,6 +64,7 @@ export default async function Checkout(props: {
             <CheckoutSummary cart={cart} quoteTerms={quoteTerms} />
           </div>
         </div>
+        </DeliveryCheckProvider>
       </CartUpdateProvider>
     </PaymentWrapper>
   )
