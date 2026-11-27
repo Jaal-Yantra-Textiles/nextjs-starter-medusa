@@ -11,6 +11,18 @@ export type DeliveryCheckResult = {
   country_code: string
   postal_code: string
   invalid?: boolean
+  /**
+   * Only when the check was asked with a cart: may THIS cart pay cash to the
+   * courier at this address? The same rule the backend enforces when the order
+   * is placed (Delhivery COD for the PIN, India + INR, no design order or
+   * deposit, under the cap). null = couldn't tell.
+   */
+  courier_cod?: {
+    allowed: boolean
+    reason: string
+    /** ₹ COD fee added to the delivery charge when paying cash (taxed like delivery). */
+    fee?: number
+  } | null
 }
 
 /**
@@ -27,15 +39,35 @@ export const isCheckablePostal = (countryCode: string, postalCode: string): bool
 }
 
 /**
- * Drop cash on delivery when the delivery check says this address can't take
- * it. Only a definite `false` removes it: an unknown answer (null) or no
- * check at all leaves the list alone.
+ * Which payment methods to offer, cash included or not.
+ *
+ * - PICKUP: cash stays (the buyer pays at our counter), as before.
+ * - COURIER: cash only on a definite yes from the delivery check for this cart
+ *   (`courier_cod.allowed`). No answer, an unknown, or a no all hide it — the
+ *   backend refuses a courier cash order it hasn't approved, so offering it
+ *   on a maybe would only end in an error at "Place order".
  */
-export const filterCodForDelivery = <T extends { id: string }>(
+export const offeredPaymentMethods = <T extends { id: string }>(
   methods: T[],
-  check: Pick<DeliveryCheckResult, "cod_available"> | null | undefined
-): T[] =>
-  check?.cod_available === false ? methods.filter((m) => !isManual(m.id)) : methods
+  opts: {
+    isPickup: boolean
+    check: Pick<DeliveryCheckResult, "courier_cod"> | null | undefined
+  }
+): T[] => {
+  if (opts.isPickup) return methods
+  return opts.check?.courier_cod?.allowed === true
+    ? methods
+    : methods.filter((m) => !isManual(m.id))
+}
+
+/** Can this address pay cash on delivery? Prefers the cart-aware answer. */
+export const codAnswer = (
+  check: Pick<DeliveryCheckResult, "cod_available" | "courier_cod"> | null | undefined
+): boolean | null => {
+  if (!check) return null
+  if (check.courier_cod) return check.courier_cod.allowed
+  return check.cod_available
+}
 
 export const etaLabel = (eta: DeliveryCheckResult["eta_days"]): string | null => {
   if (!eta) return null

@@ -1,11 +1,12 @@
 "use client"
 
-import { filterCodForDelivery } from "@lib/util/delivery-check"
+import { offeredPaymentMethods } from "@lib/util/delivery-check"
 import { useDeliveryCheckResult } from "@modules/checkout/components/delivery-check"
 import { useState, useEffect, useRef, useContext, useMemo } from "react"
 import { initiatePaymentSession, placeOrder } from "@lib/data/cart"
 import {
   buildPaymentSessionData,
+  isManual,
   isPaymentSessionReady,
   isStripeLike,
   paymentInfoMap,
@@ -41,7 +42,10 @@ import { useRouter, useSearchParams } from "next/navigation"
 
 interface CheckoutPaymentSectionProps {
   cart: HttpTypes.StoreCart
+  /** Every method the region has, cash included; this section decides on cash. */
   availablePaymentMethods: { id: string }[]
+  /** The cart's delivery is an in-person pickup (cash at the counter). */
+  isPickup: boolean
   /** Single-page checkout: billing is a field group in the form instead. */
   hideBilling?: boolean
 }
@@ -59,22 +63,26 @@ function providerSubLabel(id: string) {
 export default function CheckoutPaymentSection({
   cart,
   availablePaymentMethods: offeredMethods,
+  isPickup,
   hideBilling = false,
 }: CheckoutPaymentSectionProps) {
-  // The delivery check under the shipping postcode can rule cash on delivery
-  // out for that address. Only a definite "no" removes it.
+  // Cash: always on pickup; on courier delivery only when the delivery check
+  // for this cart says yes (the backend enforces the same rule on placing).
   const deliveryCheck = useDeliveryCheckResult()
   const availablePaymentMethods = useMemo(
-    () => filterCodForDelivery(offeredMethods, deliveryCheck),
-    [offeredMethods, deliveryCheck]
+    () => offeredPaymentMethods(offeredMethods, { isPickup, check: deliveryCheck }),
+    [offeredMethods, isPickup, deliveryCheck]
   )
+  // The ₹ COD fee on a COURIER cash order (none on pickup). 0 = no fee shown.
+  const courierCodFee =
+    !isPickup && deliveryCheck?.courier_cod?.allowed ? deliveryCheck.courier_cod.fee ?? 0 : 0
   const router = useRouter()
   const searchParams = useSearchParams()
   const latestSession = cart.payment_collection?.payment_sessions?.[0]
 
-  // Only a method still on offer counts. Cash is offered for pickup only, so
-  // a cash session left over from pickup must not survive a switch to
-  // courier delivery (it would place a shipped order as cash).
+  // Only a method still on offer counts: a cash session left over from pickup
+  // (or from a COD PIN) must not survive a switch to an address or delivery
+  // where cash isn't offered.
   const isOffered = (id?: string | null) =>
     !!id && availablePaymentMethods.some((m) => m.id === id)
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
@@ -261,7 +269,9 @@ export default function CheckoutPaymentSection({
                         {info?.title ?? method.id}
                       </span>
                       <span className="txt-compact-xsmall text-ui-fg-subtle">
-                        {providerSubLabel(method.id)}
+                        {isManual(method.id) && courierCodFee
+                          ? `+₹${courierCodFee.toLocaleString("en-IN")} fee`
+                          : providerSubLabel(method.id)}
                       </span>
                     </div>
                   </div>
@@ -269,6 +279,14 @@ export default function CheckoutPaymentSection({
               )
             })}
           </div>
+          )}
+
+          {/* Courier cash on delivery carries a fee: say so before they choose. */}
+          {courierCodFee > 0 && availablePaymentMethods.some((m) => isManual(m.id)) && (
+            <p className="txt-compact-xsmall text-ui-fg-subtle" data-testid="cod-fee-note">
+              Cash on delivery adds a ₹{courierCodFee.toLocaleString("en-IN")} fee to the
+              delivery charge (taxed like delivery). You pay it to the courier with your order.
+            </p>
           )}
 
           {/* Stripe card input */}

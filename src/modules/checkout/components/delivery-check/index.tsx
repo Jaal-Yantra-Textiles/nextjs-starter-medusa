@@ -12,6 +12,7 @@ import {
 import { checkDelivery } from "@lib/data/delivery-check"
 import {
   type DeliveryCheckResult,
+  codAnswer,
   etaLabel,
   isCheckablePostal,
 } from "@lib/util/delivery-check"
@@ -111,6 +112,14 @@ export function DeliveryCheckResultView({
         ? "text-ui-fg-error"
         : "text-ui-fg-subtle"
   const eta = result.serviceable ? etaLabel(result.eta_days) : null
+  // With a cart, say what the checkout will actually offer. Courier COD
+  // switched off altogether ("disabled") is not news about this PIN: say nothing.
+  const cod =
+    result.courier_cod?.reason === "disabled" ? null : codAnswer(result)
+  const codNo =
+    result.courier_cod?.reason === "over_cap"
+      ? "Cash on delivery not available for this order total"
+      : "Cash on delivery not available here"
 
   return (
     <div aria-live="polite" className="flex flex-col gap-y-0.5" data-testid={testId}>
@@ -122,12 +131,19 @@ export function DeliveryCheckResultView({
       >
         {result.message}
       </p>
-      {result.serviceable && (eta || result.cod_available !== null) && (
+      {result.serviceable && (eta || cod !== null) && (
         <p className="txt-compact-xsmall text-ui-fg-subtle" data-testid={`${testId}-details`}>
           {eta && <span>Delivery: {eta}</span>}
-          {eta && result.cod_available !== null && <span aria-hidden="true"> · </span>}
-          {result.cod_available === true && <span>Cash on delivery available</span>}
-          {result.cod_available === false && <span>Cash on delivery not available here</span>}
+          {eta && cod !== null && <span aria-hidden="true"> · </span>}
+          {cod === true && (
+            <span>
+              Cash on delivery available
+              {result.courier_cod?.fee
+                ? ` (+₹${result.courier_cod.fee.toLocaleString("en-IN")} fee)`
+                : ""}
+            </span>
+          )}
+          {cod === false && <span>{codNo}</span>}
         </p>
       )}
     </div>
