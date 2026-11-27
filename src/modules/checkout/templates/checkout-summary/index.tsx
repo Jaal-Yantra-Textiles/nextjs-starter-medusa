@@ -1,4 +1,3 @@
-import { isManual } from "@lib/constants"
 import { listCartShippingMethods } from "@lib/data/fulfillment"
 import { listCartPaymentMethods } from "@lib/data/payment"
 import { isPickupShippingOption } from "@lib/util/fulfillment"
@@ -23,10 +22,9 @@ const CheckoutSummary = async ({
   ])
 
   /**
-   * Cash (the manual provider) is for a buyer standing at our counter: it is
-   * offered only once the cart's delivery is an in-person PICKUP. On a shipped
-   * order nobody is there to take the cash, so the region may carry the
-   * provider without every shipped cart being offered it.
+   * Cash (the manual provider): always for an in-person PICKUP; for courier
+   * delivery only where the delivery check says this cart may pay cash to the
+   * courier (decided in CheckoutPaymentSection, enforced by the backend).
    */
   const pickupOptionIds = new Set(
     (shippingOptions ?? [])
@@ -36,9 +34,7 @@ const CheckoutSummary = async ({
   const isPickup = !!cart.shipping_methods?.some(
     (m) => !!m.shipping_option_id && pickupOptionIds.has(m.shipping_option_id)
   )
-  const offeredPaymentMethods = (paymentMethods ?? []).filter(
-    (m) => !isManual(m.id) || isPickup
-  )
+  const offeredPaymentMethods = paymentMethods ?? []
 
   return (
     <div className="flex flex-col gap-y-8 px-4 py-4 lg:py-10 lg:ps-10 bg-neutral-100 lg:-me-[9999px] lg:pe-[9999px]">
@@ -53,6 +49,7 @@ const CheckoutSummary = async ({
       <CheckoutPaymentSection
         cart={cart}
         availablePaymentMethods={offeredPaymentMethods}
+        isPickup={isPickup}
       />
     </div>
   )

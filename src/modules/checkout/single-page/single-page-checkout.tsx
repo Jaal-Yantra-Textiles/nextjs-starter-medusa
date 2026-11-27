@@ -1,4 +1,3 @@
-import { isManual } from "@lib/constants"
 import { retrieveCustomerAddresses } from "@lib/data/customer"
 import { listCartShippingMethods } from "@lib/data/fulfillment"
 import { listCartPaymentMethods } from "@lib/data/payment"
@@ -60,14 +59,15 @@ export default async function SinglePageCheckout({
     .filter((c) => c.iso)
     .sort((a, b) => a.label.localeCompare(b.label))
 
-  // Cash on delivery is for pickup only (same rule as the classic checkout).
+  // Cash: always on pickup; on courier delivery only where the delivery check
+  // allows it for this cart (CheckoutPaymentSection decides, backend enforces).
   const pickupIds = new Set(
     (shippingOptions ?? []).filter((o) => isPickupShippingOption(o as any)).map((o) => o.id)
   )
   const isPickup = !!cart.shipping_methods?.some(
     (m) => !!m.shipping_option_id && pickupIds.has(m.shipping_option_id)
   )
-  const offered = (paymentMethods ?? []).filter((m) => !isManual(m.id) || isPickup)
+  const offered = paymentMethods ?? []
 
   const resolvedCountry =
     cart.shipping_address?.country_code || countryCode || cart.region?.countries?.[0]?.iso_2 || ""
@@ -96,7 +96,7 @@ export default async function SinglePageCheckout({
                 />
               }
               paymentSlot={
-                <CheckoutPaymentSection key="payment" cart={cart} availablePaymentMethods={offered} hideBilling />
+                <CheckoutPaymentSection key="payment" cart={cart} availablePaymentMethods={offered} isPickup={isPickup} hideBilling />
               }
             />
           </div>
