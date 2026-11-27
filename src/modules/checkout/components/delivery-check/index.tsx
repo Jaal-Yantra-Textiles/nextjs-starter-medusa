@@ -135,7 +135,14 @@ export function DeliveryCheckResultView({
         <p className="txt-compact-xsmall text-ui-fg-subtle" data-testid={`${testId}-details`}>
           {eta && <span>Delivery: {eta}</span>}
           {eta && cod !== null && <span aria-hidden="true"> · </span>}
-          {cod === true && <span>Cash on delivery available</span>}
+          {cod === true && (
+            <span>
+              Cash on delivery available
+              {result.courier_cod?.fee
+                ? ` (+₹${result.courier_cod.fee.toLocaleString("en-IN")} fee)`
+                : ""}
+            </span>
+          )}
           {cod === false && <span>{codNo}</span>}
         </p>
       )}

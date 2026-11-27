@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useContext, useMemo } from "react"
 import { initiatePaymentSession, placeOrder } from "@lib/data/cart"
 import {
   buildPaymentSessionData,
+  isManual,
   isPaymentSessionReady,
   isStripeLike,
   paymentInfoMap,
@@ -72,6 +73,9 @@ export default function CheckoutPaymentSection({
     () => offeredPaymentMethods(offeredMethods, { isPickup, check: deliveryCheck }),
     [offeredMethods, isPickup, deliveryCheck]
   )
+  // The ₹ COD fee on a COURIER cash order (none on pickup). 0 = no fee shown.
+  const courierCodFee =
+    !isPickup && deliveryCheck?.courier_cod?.allowed ? deliveryCheck.courier_cod.fee ?? 0 : 0
   const router = useRouter()
   const searchParams = useSearchParams()
   const latestSession = cart.payment_collection?.payment_sessions?.[0]
@@ -265,7 +269,9 @@ export default function CheckoutPaymentSection({
                         {info?.title ?? method.id}
                       </span>
                       <span className="txt-compact-xsmall text-ui-fg-subtle">
-                        {providerSubLabel(method.id)}
+                        {isManual(method.id) && courierCodFee
+                          ? `+₹${courierCodFee.toLocaleString("en-IN")} fee`
+                          : providerSubLabel(method.id)}
                       </span>
                     </div>
                   </div>
@@ -273,6 +279,14 @@ export default function CheckoutPaymentSection({
               )
             })}
           </div>
+          )}
+
+          {/* Courier cash on delivery carries a fee: say so before they choose. */}
+          {courierCodFee > 0 && availablePaymentMethods.some((m) => isManual(m.id)) && (
+            <p className="txt-compact-xsmall text-ui-fg-subtle" data-testid="cod-fee-note">
+              Cash on delivery adds a ₹{courierCodFee.toLocaleString("en-IN")} fee to the
+              delivery charge (taxed like delivery). You pay it to the courier with your order.
+            </p>
           )}
 
           {/* Stripe card input */}

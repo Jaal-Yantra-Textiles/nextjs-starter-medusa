@@ -17,7 +17,12 @@ export type DeliveryCheckResult = {
    * is placed (Delhivery COD for the PIN, India + INR, no design order or
    * deposit, under the cap). null = couldn't tell.
    */
-  courier_cod?: { allowed: boolean; reason: string } | null
+  courier_cod?: {
+    allowed: boolean
+    reason: string
+    /** ₹ COD fee added to the delivery charge when paying cash (taxed like delivery). */
+    fee?: number
+  } | null
 }
 
 /**
