@@ -52,13 +52,17 @@ const OptionSelect: React.FC<OptionSelectProps> = ({
               onClick={() => updateOption(option.id, v.value)}
               key={v.value}
               className={clx(
-                "border-ui-border-base bg-ui-bg-subtle border text-small-regular h-10 rounded-rounded p-2 flex-1 ",
+                // min-h, not h: a label that needs two lines ("Kala Cotton",
+                // "10s · 12 m pack") grows the button instead of spilling out
+                // of a fixed 40px box. flex-auto sizes each button to its
+                // label, so short values don't squeeze long ones into wrapping.
+                "border-ui-border-base bg-ui-bg-subtle border text-small-regular min-h-10 rounded-rounded px-3 py-2 flex-auto min-w-[4.5rem]",
+                "flex items-center justify-center gap-x-2 text-center leading-tight break-words",
                 {
                   "border-ui-border-interactive": v.value === current,
                   "hover:shadow-elevation-card-rest transition-shadow ease-in-out duration-150":
                     v.value !== current,
-                },
-                v.hex && "flex items-center justify-center gap-x-2"
+                }
               )}
               disabled={disabled}
               data-testid="option-button"
