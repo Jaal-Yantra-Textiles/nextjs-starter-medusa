@@ -360,7 +360,7 @@ export default function CheckoutPaymentSection({
           By clicking the Place Order button, you confirm that you have read,
           understand and accept our Terms of Use, Terms of Sale and Returns
           Policy and acknowledge that you have read our{" "}
-          <LocalizedClientLink href="/privacy" className="underline">
+          <LocalizedClientLink href="/pages/privacy-policy" className="underline">
             Privacy Policy
           </LocalizedClientLink>
           .

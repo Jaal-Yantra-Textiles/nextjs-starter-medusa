@@ -1,5 +1,6 @@
 import { retrieveCustomer } from "@lib/data/customer"
 import { STORE_NAME } from "@lib/constants"
+import { getWebsite } from "@lib/data/website"
 import { ArrowLeft, UserMini } from "@medusajs/icons"
 import LocalizedClientLink from "@modules/common/components/localized-client-link"
 import MedusaCTA from "@modules/layout/components/medusa-cta"
@@ -14,7 +15,14 @@ export default async function CheckoutLayout({
 }: {
   children: React.ReactNode
 }) {
-  const customer = await retrieveCustomer()
+  const [customer, website] = await Promise.all([
+    retrieveCustomer(),
+    getWebsite().catch(() => null),
+  ])
+  // The partner's own name, same source as the main nav; the env fallback
+  // read "Store" on every partner checkout.
+  const storeName =
+    (website?.theme as any)?.branding?.store_name || STORE_NAME
 
   return (
     <div className="min-h-screen bg-ui-bg-base flex flex-col">
@@ -29,7 +37,7 @@ export default async function CheckoutLayout({
               <ArrowLeft />
               <span className="hidden sm:inline">Back to shopping cart</span>
               <span className="sm:hidden font-semibold uppercase whitespace-nowrap">
-                {STORE_NAME}
+                {storeName}
               </span>
             </LocalizedClientLink>
           </div>
@@ -39,7 +47,7 @@ export default async function CheckoutLayout({
             className="hidden sm:block shrink-0 txt-compact-medium font-semibold text-ui-fg-subtle uppercase hover:text-ui-fg-base transition-colors"
             data-testid="store-link"
           >
-            {STORE_NAME}
+            {storeName}
           </LocalizedClientLink>
 
           <div className="flex flex-1 items-center justify-end">
@@ -69,13 +77,13 @@ export default async function CheckoutLayout({
       <footer className="border-t border-ui-border-base bg-ui-bg-base">
         <div className="flex flex-col items-center gap-2 content-container py-4 text-center lg:hidden">
           <span className="text-base font-light text-ui-fg-subtle">
-            © {new Date().getFullYear()} {STORE_NAME}. All rights reserved.
+            © {new Date().getFullYear()} {storeName}. All rights reserved.
           </span>
         </div>
 
         <div className="hidden lg:flex items-center justify-between content-container gap-2 h-16">
           <span className="txt-compact-medium font-semibold text-ui-fg-subtle uppercase">
-            {STORE_NAME}
+            {storeName}
           </span>
           <MedusaCTA />
         </div>
