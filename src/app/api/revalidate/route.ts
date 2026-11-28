@@ -2,6 +2,8 @@ import { revalidatePath, revalidateTag } from "next/cache"
 
 import { NextRequest, NextResponse } from "next/server"
 
+import { forwardRevalidate } from "@lib/util/origin-router"
+
 
 /**
  * POST /api/revalidate
@@ -71,8 +73,14 @@ export async function POST(req: NextRequest) {
     revalidatePath("/", "layout")
   }
 
+  // Self-hosted origin (#2636): drop the same entries from its cache, or a
+  // store it renders keeps showing the pre-edit page. No-op without
+  // ORIGIN_URL; never fails this webhook.
+  const origin = await forwardRevalidate(body, secret)
+
   return NextResponse.json({
     ok: true,
     revalidated: { tags, paths, defaultedToRoot: tags.length === 0 && paths.length === 0 },
+    origin,
   })
 }

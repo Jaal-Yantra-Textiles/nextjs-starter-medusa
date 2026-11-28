@@ -39,6 +39,24 @@ const nextConfig = {
   // Self-hosted origin (#2636): the Docker build sets NEXT_OUTPUT=standalone
   // to get a minimal server bundle. Vercel builds leave it unset.
   ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" } : {}),
+  // Origin build only: pages it renders are served on the partner's domain
+  // (through Vercel), but their JS/CSS must come from THIS build, not
+  // Vercel's, or every chunk 404s on a build-id mismatch.
+  ...(process.env.ORIGIN_ASSET_PREFIX
+    ? {
+        assetPrefix: process.env.ORIGIN_ASSET_PREFIX,
+        // Fonts load cross-origin from the asset prefix, and browsers refuse
+        // a cross-origin font without CORS.
+        async headers() {
+          return [
+            {
+              source: "/_next/static/:path*",
+              headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+            },
+          ]
+        },
+      }
+    : {}),
   // Pinned explicitly (see buildRoot): the storefront is a submodule with its
   // own lockfile inside the monorepo, so Next would otherwise guess between
   // the two. Tracing and Turbopack must share one root.
