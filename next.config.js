@@ -36,6 +36,9 @@ const BUILD_ROOT = buildRoot()
  */
 const nextConfig = {
   reactStrictMode: true,
+  // Self-hosted origin (#2636): the Docker build sets NEXT_OUTPUT=standalone
+  // to get a minimal server bundle. Vercel builds leave it unset.
+  ...(process.env.NEXT_OUTPUT === "standalone" ? { output: "standalone" } : {}),
   // Pinned explicitly (see buildRoot): the storefront is a submodule with its
   // own lockfile inside the monorepo, so Next would otherwise guess between
   // the two. Tracing and Turbopack must share one root.

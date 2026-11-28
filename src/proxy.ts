@@ -1,7 +1,13 @@
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
 
-import { requestHost, requestOrigin } from "@lib/util/request-host"
+import {
+  buyerCountry,
+  fromTrustedProxy,
+  originLocked,
+  requestHost,
+  requestOrigin,
+} from "@lib/util/request-host"
 import {
   CHECKOUT_VARIANT_COOKIE,
   isCheckoutPath,
@@ -82,6 +88,8 @@ function getHost(request: NextRequest): string {
 // Cloudflare Workers (`cf-ipcountry`).
 function geoCountry(request: NextRequest): string | undefined {
   return (
+    // Self-hosted origin: the country our Vercel router passed on (#2636).
+    buyerCountry(request.headers) ||
     request.headers.get("x-vercel-ip-country") ||
     request.headers.get("cf-ipcountry") ||
     undefined
@@ -243,6 +251,16 @@ async function getCountryCode(
  * Middleware to handle region selection and (multi-tenant) Host resolution.
  */
 export async function proxy(request: NextRequest) {
+  // Self-hosted origin (#2636): pages are served only through our Vercel
+  // router. A direct hit on the origin's own address could name any tenant
+  // in `x-forwarded-host`, so it gets a plain refusal instead of a store.
+  if (originLocked() && !fromTrustedProxy(request.headers)) {
+    return new NextResponse("Please visit the store at its own address.", {
+      status: 403,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    })
+  }
+
   // Skip redirect loop for visual/theme editor iframes (cross-origin cookie issue)
   const isEditorMode =
     request.nextUrl.searchParams.get("visual_editor") === "true" ||
