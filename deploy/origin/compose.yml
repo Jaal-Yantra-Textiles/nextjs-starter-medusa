@@ -1,0 +1,19 @@
+# Storefront origin box (jyt#2636). Lives at /opt/sf on the AWS t4g.small.
+# No inbound ports: buyers reach it only via Vercel → Cloudflare tunnel.
+services:
+  storefront:
+    image: ${SF_IMAGE:-ghcr.io/jaal-yantra-textiles/nextjs-starter-medusa:latest-arm64}
+    restart: unless-stopped
+    env_file: .env
+    # Loopback only; cloudflared is the way in.
+    ports: ["127.0.0.1:8000:8000"]
+    mem_limit: 1500m
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared.yml:/etc/cloudflared/config.yml:ro
+      - ./tunnel-credentials.json:/etc/cloudflared/credentials.json:ro
+    depends_on: [storefront]

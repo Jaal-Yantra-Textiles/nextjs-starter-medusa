@@ -1,0 +1,83 @@
+name: Build origin image (arm64, signed)
+
+# jyt#2636: the self-hosted storefront origin (AWS primary, Cloudflare
+# standby) runs this image behind the Vercel router. Native ARM runner, no
+# QEMU. Tags: latest-arm64 + sha-<commit>-arm64.
+#
+# Signed keylessly with cosign: the certificate names THIS workflow on THIS
+# ref, and the box refuses any image that does not verify against that
+# identity, so an image pushed any other way never runs.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-origin-arm64
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image name (lowercase)
+        id: img
+        run: |
+          echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      # NEXT_PUBLIC_* are inlined into the client bundle: public values, kept
+      # as repo variables so they match the Vercel project.
+      - name: Build & push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            NEXT_PUBLIC_MULTI_TENANT=true
+            NEXT_PUBLIC_MEDUSA_BACKEND_URL=${{ vars.NEXT_PUBLIC_MEDUSA_BACKEND_URL }}
+            NEXT_PUBLIC_DEFAULT_REGION=${{ vars.NEXT_PUBLIC_DEFAULT_REGION }}
+            NEXT_PUBLIC_MARKETPLACE_URL=${{ vars.NEXT_PUBLIC_MARKETPLACE_URL }}
+            NEXT_PUBLIC_STRIPE_KEY=${{ vars.NEXT_PUBLIC_STRIPE_KEY }}
+            NEXT_PUBLIC_ANALYTICS_SCRIPT_URL=${{ vars.NEXT_PUBLIC_ANALYTICS_SCRIPT_URL }}
+            NEXT_PUBLIC_PRODUCT_DELIVERY_CHECK=${{ vars.NEXT_PUBLIC_PRODUCT_DELIVERY_CHECK }}
+            NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
+            MEDUSA_CLOUD_S3_HOSTNAME=${{ vars.MEDUSA_CLOUD_S3_HOSTNAME }}
+            MEDUSA_CLOUD_S3_PATHNAME=${{ vars.MEDUSA_CLOUD_S3_PATHNAME }}
+          tags: |
+            ${{ steps.img.outputs.image }}:latest-arm64
+            ${{ steps.img.outputs.image }}:sha-${{ github.sha }}-arm64
+          cache-from: type=gha,scope=origin-arm64
+          cache-to: type=gha,scope=origin-arm64,mode=max
+
+      - uses: sigstore/cosign-installer@v3.7.0
+        with:
+          cosign-release: v2.4.1
+
+      # Sign the digest, never a tag: a tag can be moved after signing.
+      - name: Sign (cosign, keyless)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          test -n "$DIGEST"
+          cosign sign --yes "${{ steps.img.outputs.image }}@${DIGEST}"

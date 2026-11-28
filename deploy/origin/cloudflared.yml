@@ -1,0 +1,10 @@
+# Tunnel jyt-sf-origin (locally managed). Credentials come from SSM
+# /jyt/sf-origin/TUNNEL_CREDENTIALS via render-env.sh, never from git.
+tunnel: bf43c481-af8b-4b8a-bfbc-2629cbf66059
+credentials-file: /etc/cloudflared/credentials.json
+no-autoupdate: true
+ingress:
+  - hostname: sf-origin.jaalyantra.com
+    service: http://storefront:8000
+    originRequest: { connectTimeout: 10s }
+  - service: http_status:404
