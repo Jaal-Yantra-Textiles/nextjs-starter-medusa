@@ -2,6 +2,7 @@ import { listCartShippingMethods } from "@lib/data/fulfillment"
 import { listCartPaymentMethods } from "@lib/data/payment"
 import { isPickupShippingOption } from "@lib/util/fulfillment"
 import type { HttpTypes } from "@medusajs/types"
+import CheckoutItemList from "@modules/checkout/components/checkout-item-list"
 import DiscountCode from "@modules/checkout/components/discount-code"
 import CheckoutPaymentSection from "@modules/checkout/components/checkout-payment-section"
 import CheckoutTotals from "@modules/checkout/components/checkout-totals"
@@ -38,6 +39,11 @@ const CheckoutSummary = async ({
 
   return (
     <div className="flex flex-col gap-y-8 px-4 py-4 lg:py-10 lg:ps-10 bg-neutral-100 lg:-me-[9999px] lg:pe-[9999px]">
+      {/* What is being bought sits on the summary side, above the money —
+          the same place the single-page checkout puts it. */}
+      <h2 className="sr-only">Order summary</h2>
+      <CheckoutItemList cart={cart} />
+
       <CheckoutTotals cart={cart} />
 
       {/* Directly under the totals: the buyer has just read the full amount,

@@ -154,6 +154,22 @@ export default function CheckoutShippingSection({
 
   const shippingOptions = availableShippingOptions
 
+  // What a calculated price actually depends on. The effect below must key on
+  // THIS, not on `availableShippingOptions`: that prop is a new array after
+  // every server refresh, and each calculate call is a server action that
+  // refreshes the route — so keying on the array re-ran the effect forever
+  // (a calculate POST + 4 RSC refetches roughly every 0.6s for as long as the
+  // checkout was open, and the payment block never settled).
+  const calculatedPriceKey = [
+    cart.id,
+    cart.shipping_address?.country_code ?? "",
+    cart.shipping_address?.postal_code ?? "",
+    ...(shippingOptions ?? [])
+      .filter((sm) => sm.price_type === "calculated")
+      .map((sm) => sm.id)
+      .sort(),
+  ].join("|")
+
   useEffect(() => {
     setIsLoadingPrices(true)
     if (!shippingOptions?.length) {
@@ -185,7 +201,7 @@ export default function CheckoutShippingSection({
       setIsLoadingPrices(false)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableShippingOptions, cart.id])
+  }, [calculatedPriceKey])
 
   const handleSelectShipping = async (id: string) => {
     setShippingError(null)
