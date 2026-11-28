@@ -8,7 +8,7 @@ import {
   requestHost,
   requestOrigin,
 } from "@lib/util/request-host"
-import { originRoute } from "@lib/util/origin-router"
+import { activeOriginUrl, originRoute } from "@lib/util/origin-router"
 import {
   CHECKOUT_VARIANT_COOKIE,
   isCheckoutPath,
@@ -264,14 +264,15 @@ export async function proxy(request: NextRequest) {
 
   // Router side (Vercel, #2636): pages for routed hosts are rendered by the
   // self-hosted origin. This deployment never routes once it IS the origin.
-  if (!originLocked()) {
+  if (!originLocked() && process.env.ORIGIN_ROUTER_SECRET) {
     const route = originRoute({
       host: getHost(request),
       pathname: request.nextUrl.pathname,
       search: request.nextUrl.search,
       requestHeaders: request.headers,
       country: geoCountry(request),
-      env: process.env,
+      // Global Config can override ORIGIN_URL for an instant failover.
+      env: { ...process.env, ORIGIN_URL: await activeOriginUrl() },
     })
     if (route) {
       return NextResponse.rewrite(new URL(route.url), {
