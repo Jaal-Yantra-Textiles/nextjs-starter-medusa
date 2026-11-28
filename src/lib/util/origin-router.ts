@@ -142,12 +142,15 @@ export async function activeOriginUrl(
   }
   let url: string | undefined
   try {
-    const get =
-      read ??
-      (await import("@vercel/global-config").then(
-        ({ createClient }) => createClient(conn).get
-      ))
-    url = pickOriginUrl(await get("origin_url"), fallback)
+    let value: unknown
+    if (read) {
+      value = await read("origin_url")
+    } else {
+      const { createClient } = await import("@vercel/global-config")
+      // Call through the client: a detached `get` loses its `this`.
+      value = await createClient(conn).get("origin_url")
+    }
+    url = pickOriginUrl(value, fallback)
   } catch {
     url = fallback
   }
