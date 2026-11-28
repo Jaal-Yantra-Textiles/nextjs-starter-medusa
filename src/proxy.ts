@@ -8,6 +8,7 @@ import {
   requestHost,
   requestOrigin,
 } from "@lib/util/request-host"
+import { originRoute } from "@lib/util/origin-router"
 import {
   CHECKOUT_VARIANT_COOKIE,
   isCheckoutPath,
@@ -259,6 +260,24 @@ export async function proxy(request: NextRequest) {
       status: 403,
       headers: { "content-type": "text/plain; charset=utf-8" },
     })
+  }
+
+  // Router side (Vercel, #2636): pages for routed hosts are rendered by the
+  // self-hosted origin. This deployment never routes once it IS the origin.
+  if (!originLocked()) {
+    const route = originRoute({
+      host: getHost(request),
+      pathname: request.nextUrl.pathname,
+      search: request.nextUrl.search,
+      requestHeaders: request.headers,
+      country: geoCountry(request),
+      env: process.env,
+    })
+    if (route) {
+      return NextResponse.rewrite(new URL(route.url), {
+        request: { headers: route.headers },
+      })
+    }
   }
 
   // Skip redirect loop for visual/theme editor iframes (cross-origin cookie issue)
