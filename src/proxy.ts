@@ -8,7 +8,13 @@ import {
   requestHost,
   requestOrigin,
 } from "@lib/util/request-host"
-import { activeOriginUrl, originRoute } from "@lib/util/origin-router"
+import {
+  activeOriginConfig,
+  chooseOrigin,
+  ORIGIN_COOKIE,
+  ORIGIN_COOKIE_MAX_AGE,
+  originRoute,
+} from "@lib/util/origin-router"
 import {
   CHECKOUT_VARIANT_COOKIE,
   isCheckoutPath,
@@ -265,19 +271,37 @@ export async function proxy(request: NextRequest) {
   // Router side (Vercel, #2636): pages for routed hosts are rendered by the
   // self-hosted origin. This deployment never routes once it IS the origin.
   if (!originLocked() && process.env.ORIGIN_ROUTER_SECRET) {
+    // Global Config: `origin_url` (failover) + `standby_percent` (sticky
+    // split between the AWS primary and the Cloudflare standby).
+    const cfg = await activeOriginConfig()
+    const choice = chooseOrigin({
+      originUrl: cfg.url,
+      standbyUrl: process.env.ORIGIN_STANDBY_URL,
+      standbyPercent: cfg.standbyPercent,
+      cookie: request.cookies.get(ORIGIN_COOKIE)?.value,
+    })
     const route = originRoute({
       host: getHost(request),
       pathname: request.nextUrl.pathname,
       search: request.nextUrl.search,
       requestHeaders: request.headers,
       country: geoCountry(request),
-      // Global Config can override ORIGIN_URL for an instant failover.
-      env: { ...process.env, ORIGIN_URL: await activeOriginUrl() },
+      env: { ...process.env, ORIGIN_URL: choice.url },
     })
     if (route) {
-      return NextResponse.rewrite(new URL(route.url), {
+      const res = NextResponse.rewrite(new URL(route.url), {
         request: { headers: route.headers },
       })
+      if (choice.setCookie) {
+        res.cookies.set(ORIGIN_COOKIE, choice.setCookie, {
+          maxAge: ORIGIN_COOKIE_MAX_AGE,
+          path: "/",
+          sameSite: "lax",
+          secure: true,
+          httpOnly: true,
+        })
+      }
+      return res
     }
   }
 

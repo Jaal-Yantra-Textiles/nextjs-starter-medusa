@@ -118,7 +118,8 @@ export async function forwardRevalidate(
  * Cached per instance for a few seconds so the read is not per request.
  */
 const ORIGIN_CACHE_MS = 5000
-let originCache: { url: string | undefined; at: number } | null = null
+type OriginConfig = { url: string | undefined; standbyPercent: number }
+let originCache: (OriginConfig & { at: number }) | null = null
 
 export function pickOriginUrl(
   configured: unknown,
@@ -129,33 +130,95 @@ export function pickOriginUrl(
     : fallback
 }
 
+/** A share of new visitors, 0-100; anything else is 0 (all on the primary). */
+export function pickStandbyPercent(value: unknown): number {
+  const n = typeof value === "string" ? Number(value) : value
+  return typeof n === "number" && Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0
+}
+
+/**
+ * `origin_url` (failover switch) and `standby_percent` (sticky traffic split)
+ * from Global Config, cached a few seconds. Any read error → the env
+ * ORIGIN_URL and no split, i.e. exactly the old single-origin behaviour.
+ */
+export async function activeOriginConfig(
+  env: RouterEnv = process.env,
+  read?: (key: string) => Promise<unknown>
+): Promise<OriginConfig> {
+  const fallback = env.ORIGIN_URL
+  const conn = env.ORIGIN_GLOBAL_CONFIG
+  if (!conn && !read) return { url: fallback, standbyPercent: 0 }
+  const now = Date.now()
+  if (originCache && now - originCache.at < ORIGIN_CACHE_MS) {
+    return { url: originCache.url ?? fallback, standbyPercent: originCache.standbyPercent }
+  }
+  let cfg: OriginConfig = { url: fallback, standbyPercent: 0 }
+  try {
+    let urlValue: unknown
+    let pctValue: unknown
+    if (read) {
+      urlValue = await read("origin_url")
+      pctValue = await read("standby_percent")
+    } else {
+      const { createClient } = await import("@vercel/global-config")
+      // Call through the client: a detached `getAll` loses its `this`.
+      const all: any = await createClient(conn).getAll(["origin_url", "standby_percent"])
+      urlValue = all?.origin_url
+      pctValue = all?.standby_percent
+    }
+    cfg = { url: pickOriginUrl(urlValue, fallback), standbyPercent: pickStandbyPercent(pctValue) }
+  } catch {
+    cfg = { url: fallback, standbyPercent: 0 }
+  }
+  originCache = { ...cfg, at: now }
+  return cfg
+}
+
+/** The active origin URL alone (failover switch only). */
 export async function activeOriginUrl(
   env: RouterEnv = process.env,
   read?: (key: string) => Promise<unknown>
 ): Promise<string | undefined> {
-  const fallback = env.ORIGIN_URL
-  const conn = env.ORIGIN_GLOBAL_CONFIG
-  if (!conn && !read) return fallback
-  const now = Date.now()
-  if (originCache && now - originCache.at < ORIGIN_CACHE_MS) {
-    return originCache.url ?? fallback
+  return (await activeOriginConfig(env, read)).url
+}
+
+/** Cookie that keeps a visitor on one origin: each has its own build. */
+export const ORIGIN_COOKIE = "jyt_origin"
+export const ORIGIN_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+
+/**
+ * Which origin serves this visitor.
+ *
+ * - Failover (`origin_url` is the standby): everyone goes to the standby.
+ * - No standby, or a 0% split: everyone goes to `origin_url`.
+ * - Otherwise a STICKY split: a visitor keeps the origin in their cookie; a new
+ *   visitor lands on the standby with probability `standbyPercent`. Sticky
+ *   because the two origins are separate builds: mixing them mid-visit makes
+ *   Next.js hard-reload on the build mismatch.
+ *
+ * Returns the URL and the cookie value to set (only when it changes).
+ */
+export function chooseOrigin(input: {
+  originUrl?: string
+  standbyUrl?: string
+  standbyPercent: number
+  cookie?: string | null
+  rand?: () => number
+}): { url?: string; bucket: "p" | "s"; setCookie?: "p" | "s" } {
+  const { originUrl, standbyUrl, standbyPercent, cookie } = input
+  const strip = (u?: string) => (u || "").replace(/\/+$/, "")
+  if (standbyUrl && strip(originUrl) === strip(standbyUrl)) {
+    return { url: standbyUrl, bucket: "s" }
   }
-  let url: string | undefined
-  try {
-    let value: unknown
-    if (read) {
-      value = await read("origin_url")
-    } else {
-      const { createClient } = await import("@vercel/global-config")
-      // Call through the client: a detached `get` loses its `this`.
-      value = await createClient(conn).get("origin_url")
-    }
-    url = pickOriginUrl(value, fallback)
-  } catch {
-    url = fallback
+  if (!standbyUrl || standbyPercent <= 0) {
+    return { url: originUrl, bucket: "p", ...(cookie === "s" ? { setCookie: "p" as const } : {}) }
   }
-  originCache = { url, at: now }
-  return url
+  if (cookie === "s") return { url: standbyUrl, bucket: "s" }
+  if (cookie === "p") return { url: originUrl, bucket: "p" }
+  const roll = (input.rand ?? Math.random)() * 100
+  return roll < standbyPercent
+    ? { url: standbyUrl, bucket: "s", setCookie: "s" }
+    : { url: originUrl, bucket: "p", setCookie: "p" }
 }
 
 /** Test hook: forget the cached origin. */
