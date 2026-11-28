@@ -4,7 +4,6 @@ import { retrieveCustomerAddresses } from "@lib/data/customer"
 import type { HttpTypes } from "@medusajs/types"
 import CheckoutShippingSection from "@modules/checkout/components/checkout-shipping-section"
 import CheckoutInfoRows from "@modules/checkout/components/checkout-info-rows"
-import CheckoutItemList from "@modules/checkout/components/checkout-item-list"
 import SignInPrompt from "@modules/checkout/components/sign-in-prompt"
 
 export default async function CheckoutForm({
@@ -46,8 +45,6 @@ export default async function CheckoutForm({
         addresses={addresses}
         availableShippingMethods={shippingOptions}
       />
-
-      <CheckoutItemList cart={cart} />
     </div>
   )
 }
