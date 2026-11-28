@@ -3,7 +3,7 @@
   "name": "jyt-sf-standby",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
-  "routes": [{ "pattern": "sf-standby.jaalyantra.com", "custom_domain": true }],
+  "routes": [{ "pattern": "sf-standby.cicilabel.com", "custom_domain": true }],
   "vars": { "MEDUSA_BACKEND_URL": "https://v3.jaalyantra.com" },
   "containers": [
     {
@@ -13,7 +13,7 @@
       "image_build_context": "../..",
       // Build-time values (NEXT_PUBLIC_* are inlined into the client bundle).
       "image_vars": {
-        "ORIGIN_ASSET_PREFIX": "https://sf-standby.jaalyantra.com",
+        "ORIGIN_ASSET_PREFIX": "https://sf-standby.cicilabel.com",
         "NEXT_PUBLIC_MULTI_TENANT": "true",
         "NEXT_PUBLIC_MEDUSA_BACKEND_URL": "https://v3.jaalyantra.com",
         "NEXT_PUBLIC_BASE_URL": "https://stores.cicilabel.com",

@@ -4,7 +4,7 @@
  * The same Next.js image as the AWS primary (repo-root Dockerfile), built for
  * linux/amd64 with its own ORIGIN_ASSET_PREFIX so the pages it renders load
  * JS/CSS from this host, not the primary's. Reached at
- * https://sf-standby.jaalyantra.com; the Vercel router points here only when
+ * https://sf-standby.cicilabel.com; the Vercel router points here only when
  * the primary is down.
  *
  * One named instance serves everything: a standby is idle almost always, so
@@ -21,6 +21,7 @@ type Env = {
   REVALIDATE_SECRET: string
   STOREFRONT_REVALIDATE_SECRET: string
   MEDUSA_BACKEND_URL: string
+  GIT_SHA?: string
 }
 
 export class Storefront extends Container<Env> {
@@ -39,6 +40,7 @@ export class Storefront extends Container<Env> {
       NEXT_PUBLIC_MULTI_TENANT: "true",
       PORT: "8000",
       HOSTNAME: "0.0.0.0",
+      GIT_SHA: env.GIT_SHA || "manual",
     }
   }
 }

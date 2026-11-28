@@ -8,12 +8,17 @@
 
 FROM node:22-alpine AS deps
 WORKDIR /app
+# Build stages only: IPv4-first DNS. Under QEMU (an amd64 build on an arm64
+# Mac, for the Cloudflare standby) node's fetch times out on dual-stack
+# lookups, so corepack/pnpm cannot download anything. Harmless elsewhere.
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
 RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 FROM node:22-alpine AS build
 WORKDIR /app
+ENV NODE_OPTIONS=--dns-result-order=ipv4first
 RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .

@@ -30,23 +30,37 @@ jobs:
     defaults:
       run:
         working-directory: deploy/standby
+    env:
+      # Until the token exists the standby is deployed by hand
+      # (npm run deploy in deploy/standby); skip instead of failing red.
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
+      - name: No Cloudflare token yet
+        if: env.HAS_TOKEN != 'true'
+        working-directory: .
+        run: echo "::notice::CLOUDFLARE_API_TOKEN not set; standby deploy skipped"
+
       - uses: actions/checkout@v4
+        if: env.HAS_TOKEN == 'true'
 
       - uses: actions/setup-node@v4
+        if: env.HAS_TOKEN == 'true'
         with:
           node-version: 22
 
       - name: Install wrangler
+        if: env.HAS_TOKEN == 'true'
         run: npm ci
 
       - name: Deploy (builds the image from the repo-root Dockerfile)
+        if: env.HAS_TOKEN == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy
+        run: npx wrangler deploy --var GIT_SHA:${{ github.sha }}
 
       - name: Sync runtime secrets into the Worker
+        if: env.HAS_TOKEN == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
