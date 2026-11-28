@@ -10,6 +10,8 @@ umask 077
   echo "MEDUSA_BACKEND_URL=https://v3.jaalyantra.com"
   echo "ORIGIN_PROXY_SECRET=$(get ORIGIN_PROXY_SECRET)"
   echo "NEXT_PUBLIC_MULTI_TENANT=true"
+  echo "REVALIDATE_SECRET=$(get REVALIDATE_SECRET)"
+  echo "STOREFRONT_REVALIDATE_SECRET=$(get STOREFRONT_REVALIDATE_SECRET)"
 } > .env.new
 # Keep the pinned image across re-renders.
 grep -E '^SF_IMAGE=' .env 2>/dev/null >> .env.new || true
