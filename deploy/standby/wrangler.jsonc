@@ -1,0 +1,33 @@
+{
+  // Standby storefront origin (jyt#2636). Deploy: npm run deploy
+  "name": "jyt-sf-standby",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "routes": [{ "pattern": "sf-standby.jaalyantra.com", "custom_domain": true }],
+  "vars": { "MEDUSA_BACKEND_URL": "https://v3.jaalyantra.com" },
+  "containers": [
+    {
+      "class_name": "Storefront",
+      // The same Dockerfile as the AWS primary, built from the repo root.
+      "image": "../../Dockerfile",
+      "image_build_context": "../..",
+      // Build-time values (NEXT_PUBLIC_* are inlined into the client bundle).
+      "image_vars": {
+        "ORIGIN_ASSET_PREFIX": "https://sf-standby.jaalyantra.com",
+        "NEXT_PUBLIC_MULTI_TENANT": "true",
+        "NEXT_PUBLIC_MEDUSA_BACKEND_URL": "https://v3.jaalyantra.com",
+        "NEXT_PUBLIC_BASE_URL": "https://stores.cicilabel.com",
+        "NEXT_PUBLIC_STRIPE_KEY": "pk_live_51NOlHsHSJb39Hclxb6Fu4FvWOyp2ftYJV4Hr4qtJo6KfPJnyb6due6sFJ4woOEDdjcn9vjl9jbZfTPIcVuu7CzW700KvUn0z4S",
+        "MEDUSA_CLOUD_S3_HOSTNAME": "automatic.jaalyantra.com",
+        "MEDUSA_CLOUD_S3_PATHNAME": "/automatica/**"
+      },
+      "instance_type": "standard-1",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "STOREFRONT", "class_name": "Storefront" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Storefront"] }],
+  "observability": { "enabled": true }
+}

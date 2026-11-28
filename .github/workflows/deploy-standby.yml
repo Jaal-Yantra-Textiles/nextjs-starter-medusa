@@ -1,0 +1,59 @@
+name: Deploy standby origin (Cloudflare Containers)
+
+# jyt#2636: keeps the Cloudflare standby on the same code as the AWS primary.
+# Every push to main rebuilds the image for linux/amd64 (Containers' only
+# architecture) on a native x86 runner and deploys the Worker + container.
+#
+# Secrets (repo settings):
+#   CLOUDFLARE_API_TOKEN   Workers Scripts:Edit, Containers:Edit, Workers
+#                          Routes / zone DNS for sf-standby.jaalyantra.com
+#   CLOUDFLARE_ACCOUNT_ID  c9b8b538…
+#   ORIGIN_PROXY_SECRET, REVALIDATE_SECRET, STOREFRONT_REVALIDATE_SECRET
+#                          same values as the AWS box (SSM /jyt/sf-origin/*)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-standby
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: deploy/standby
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install wrangler
+        run: npm ci
+
+      - name: Deploy (builds the image from the repo-root Dockerfile)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      - name: Sync runtime secrets into the Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ORIGIN_PROXY_SECRET: ${{ secrets.ORIGIN_PROXY_SECRET }}
+          REVALIDATE_SECRET: ${{ secrets.REVALIDATE_SECRET }}
+          STOREFRONT_REVALIDATE_SECRET: ${{ secrets.STOREFRONT_REVALIDATE_SECRET }}
+        run: |
+          node -e 'const k=["ORIGIN_PROXY_SECRET","REVALIDATE_SECRET","STOREFRONT_REVALIDATE_SECRET"];const o={};for(const n of k){if(!process.env[n]){console.error("missing "+n);process.exit(1)}o[n]=process.env[n]}require("fs").writeFileSync("/tmp/s.json",JSON.stringify(o))'
+          npx wrangler secret bulk /tmp/s.json
+          rm -f /tmp/s.json
